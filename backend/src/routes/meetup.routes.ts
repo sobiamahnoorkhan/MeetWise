@@ -27,6 +27,7 @@ meetupRouter.patch("/:id/members/:memberId/preferences",(req,res)=>{
  const m=find(req.params.id);if(!m)return res.status(404).json({error:"Meetup not found or expired"});
  try{return res.json(updatePreferences(m,req.params.memberId,req.body as MemberPreferences));}catch(e){return res.status(404).json({error:e instanceof Error?e.message:"Member not found"});}
 });
+meetupRouter.get("/:id/chat",(req,res)=>{const m=find(req.params.id);return m?res.json(m.chat):res.status(404).json({error:"Meetup not found or expired"});});
 meetupRouter.post("/:id/chat",(req,res)=>{
  const m=find(req.params.id);if(!m)return res.status(404).json({error:"Meetup not found or expired"});
  const memberId=typeof req.body?.memberId==="string"?req.body.memberId:"",text=typeof req.body?.text==="string"?req.body.text.trim():"";
@@ -39,10 +40,13 @@ meetupRouter.post("/:id/votes",(req,res)=>{
  if(!memberId||!optionId)return res.status(400).json({error:"memberId and optionId are required"});
  try{return res.status(201).json({votes:castVote(m,memberId,optionId)});}catch(e){return res.status(403).json({error:e instanceof Error?e.message:"Member does not belong to this meetup"});}
 });
-meetupRouter.post("/:id/plan",(req,res)=>{const m=find(req.params.id);return m?res.json(generatePlan(m)):res.status(404).json({error:"Meetup not found or expired"});});
-meetupRouter.post("/:id/replan",(req,res)=>{
+meetupRouter.post("/:id/plan",async(req,res)=>{
+ const m=find(req.params.id);if(!m)return res.status(404).json({error:"Meetup not found or expired"});
+ try{return res.json(await generatePlan(m,typeof req.body?.when==="string"?req.body.when:undefined));}catch(e){return res.status(502).json({error:e instanceof Error?e.message:"Planning unavailable"});}
+});
+meetupRouter.post("/:id/replan",async(req,res)=>{
  const m=find(req.params.id);if(!m)return res.status(404).json({error:"Meetup not found or expired"});
  const reason=typeof req.body?.reason==="string"&&req.body.reason.trim()?req.body.reason.trim():"A meetup constraint changed";
  const memberId=typeof req.body?.memberId==="string"?req.body.memberId:undefined;
- return res.json(replanMeetup(m,reason,memberId));
+ try{return res.json(await replanMeetup(m,reason,memberId));}catch(e){return res.status(502).json({error:e instanceof Error?e.message:"Replanning unavailable"});}
 });
