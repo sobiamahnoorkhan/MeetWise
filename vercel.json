@@ -1,8 +1,8 @@
 {
   "version": 2,
   "cleanUrls": true,
-  "routes": [
-    { "src": "/", "dest": "/frontend/index.html" },
-    { "src": "/(.*)", "dest": "/frontend/$1" }
+  "rewrites": [
+    { "source": "/", "destination": "/frontend/index.html" },
+    { "source": "/(.*)", "destination": "/frontend/$1" }
   ]
 }
