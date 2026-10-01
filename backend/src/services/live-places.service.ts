@@ -134,34 +134,43 @@ async function overpass(center:Center,radiusKm:number,results:PlaceCandidate[],s
 }
 
 export async function findPlaces(area:string,preferences:string[],center?:Center):Promise<PlaceCandidate[]>{
- const queries=[...new Set([...preferences.filter(Boolean),"restaurant","cafe","park","food","shopping mall","sports centre","cinema"])].slice(0,10);
+ const queries=[...new Set([
+  ...preferences.filter(Boolean),
+  "restaurant","cafe","fast food","food","park","shopping mall","cinema","sports"
+ ])].slice(0,10);
  const results:PlaceCandidate[]=[]; const seen=new Set<string>();
- const radiusKm=center?Math.min(25,Math.max(5,Number(area)||5)):25;
+ const radiusKm=center?Math.min(25,Math.max(5,Number(area)||8)):25;
  const localArea=center?await reverseArea(center):area;
 
- for(const query of queries){
-  try{await nominatim(query,localArea,center,radiusKm,results,seen);}catch{}
-  if(results.length>=12)break;
- }
-
- if(center && results.length<12){
-  const localRadius=Math.min(25,Math.max(8,radiusKm*1.5));
-  for(const q of ["restaurant","cafe","pizza","burger","park","shopping mall","cinema","sports"]){
-   await photon(center,q,localRadius,results,seen);
-   if(results.length>=20)break;
+ // Use Photon first because it is a fast place-search endpoint and does not
+ // depend on Nominatim's stricter search rate limits.
+ if(center){
+  const photonRadius=Math.min(25,Math.max(8,radiusKm*1.5));
+  for(const q of queries){
+   await photon(center,q,photonRadius,results,seen);
+   if(results.length>=18)break;
   }
  }
 
- if(center && results.length<8){
-  await overpass(center,Math.min(25,Math.max(8,radiusKm*1.5)),results,seen);
+ // Overpass gives a direct OSM feature search when Photon has sparse coverage.
+ if(center && results.length<10){
+  await overpass(center,Math.min(25,Math.max(10,radiusKm*1.75)),results,seen);
  }
 
+ // Nominatim remains the area-aware fallback for named and category searches.
+ for(const query of queries){
+  try{await nominatim(query,localArea,center,radiusKm,results,seen);}catch{}
+  if(results.length>=15)break;
+ }
+
+ // Last-resort broad search: ask Nominatim without a bounding box, then keep
+ // only places close enough to the calculated shared meeting area.
  if(center && results.length<5){
-  for(const query of ["restaurant","cafe","pizza","burger","park","shopping mall","cinema","sports ground"]){
+  for(const query of ["restaurant","cafe","fast food","park","shopping mall","cinema","sports ground"]){
    try{await nominatim(query,localArea,undefined,0,results,seen);}catch{}
    if(results.length>=10)break;
   }
-  const finalRadius=Math.min(25,Math.max(8,radiusKm*1.5));
+  const finalRadius=Math.min(25,Math.max(10,radiusKm*1.75));
   for(let i=results.length-1;i>=0;i--){
    if(distanceKm(center,{latitude:results[i].latitude,longitude:results[i].longitude})>finalRadius)results.splice(i,1);
   }
