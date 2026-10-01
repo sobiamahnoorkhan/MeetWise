@@ -5,6 +5,7 @@ import { Member,MemberPreferences,Meetup } from "../types.js";
 import { addChatMessage,castVote,updatePreferences } from "../services/meetup.service.js";
 import { generatePlan } from "../services/planner.service.js";
 import { replanMeetup } from "../services/replan.service.js";
+import { analyzeMeetup } from "../services/gemini.service.js";
 export const meetupRouter=Router();
 const find=(id:string)=>getMeetup(id);
 meetupRouter.post("/",(req,res)=>{
@@ -28,11 +29,21 @@ meetupRouter.patch("/:id/members/:memberId/preferences",(req,res)=>{
  try{return res.json(updatePreferences(m,req.params.memberId,req.body as MemberPreferences));}catch(e){return res.status(404).json({error:e instanceof Error?e.message:"Member not found"});}
 });
 meetupRouter.get("/:id/chat",(req,res)=>{const m=find(req.params.id);return m?res.json(m.chat):res.status(404).json({error:"Meetup not found or expired"});});
-meetupRouter.post("/:id/chat",(req,res)=>{
+meetupRouter.post("/:id/chat",async(req,res)=>{
  const m=find(req.params.id);if(!m)return res.status(404).json({error:"Meetup not found or expired"});
  const memberId=typeof req.body?.memberId==="string"?req.body.memberId:"",text=typeof req.body?.text==="string"?req.body.text.trim():"";
  if(!memberId||!text)return res.status(400).json({error:"memberId and text are required"});
- try{return res.status(201).json(addChatMessage(m,memberId,text));}catch(e){return res.status(403).json({error:e instanceof Error?e.message:"Member does not belong to this meetup"});}
+ try{
+  const message=addChatMessage(m,memberId,text);
+  let aiAnalysis;
+  try{aiAnalysis=await analyzeMeetup(m,text)}catch{aiAnalysis={available:false,reason:"AI analysis unavailable"}}
+  return res.status(201).json({message,aiAnalysis});
+ }catch(e){return res.status(403).json({error:e instanceof Error?e.message:"Member does not belong to this meetup"});}
+});
+meetupRouter.get("/:id/votes",(req,res)=>{
+ const m=find(req.params.id);if(!m)return res.status(404).json({error:"Meetup not found or expired"});
+ const counts=Object.entries(m.votes.reduce<Record<string,number>>((a,v)=>(a[v.optionId]=(a[v.optionId]??0)+1,a),{})).map(([optionId,votes])=>({optionId,votes}));
+ return res.json({votes:m.votes,counts});
 });
 meetupRouter.post("/:id/votes",(req,res)=>{
  const m=find(req.params.id);if(!m)return res.status(404).json({error:"Meetup not found or expired"});
@@ -48,5 +59,6 @@ meetupRouter.post("/:id/replan",async(req,res)=>{
  const m=find(req.params.id);if(!m)return res.status(404).json({error:"Meetup not found or expired"});
  const reason=typeof req.body?.reason==="string"&&req.body.reason.trim()?req.body.reason.trim():"A meetup constraint changed";
  const memberId=typeof req.body?.memberId==="string"?req.body.memberId:undefined;
- try{return res.json(await replanMeetup(m,reason,memberId));}catch(e){return res.status(502).json({error:e instanceof Error?e.message:"Replanning unavailable"});}
+ const when=typeof req.body?.when==="string"?req.body.when:undefined;
+ try{return res.json(await replanMeetup(m,reason,memberId,when));}catch(e){return res.status(502).json({error:e instanceof Error?e.message:"Replanning unavailable"});}
 });
