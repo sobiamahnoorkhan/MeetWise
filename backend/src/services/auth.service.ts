@@ -1,30 +1,51 @@
-import { createHmac,randomBytes,randomUUID,scryptSync,timingSafeEqual } from "node:crypto";
-interface User{id:string;name:string;email:string;passwordHash:string;passwordSalt:string;createdAt:string}
-const users=new Map<string,User>(),sessions=new Map<string,string>();
-const secret=process.env.SESSION_SECRET??"meetwise-development-secret";
+import { createHmac,randomBytes,scryptSync,timingSafeEqual } from "node:crypto";
+import { supabase } from "../db.js";
+
 const hash=(p:string,salt:string)=>scryptSync(p,salt,64).toString("hex");
-const token=(id:string)=>Buffer.from(id+"."+createHmac("sha256",secret).update(id).digest("hex")).toString("base64url");
-export function signup(name:string,email:string,password:string){
+const token=(id:string)=>Buffer.from(id+"."+createHmac("sha256",process.env.SESSION_SECRET??"meetwise-development-secret").update(id).digest("hex")).toString("base64url");
+
+export async function signup(name:string,email:string,password:string){
  const e=email.trim().toLowerCase();
- if(users.has(e))throw new Error("An account with this email already exists");
  if(password.length<8)throw new Error("Password must be at least 8 characters");
  const salt=randomBytes(16).toString("hex");
- const u={id:randomUUID(),name:name.trim(),email:e,passwordHash:hash(password,salt),passwordSalt:salt,createdAt:new Date().toISOString()};
- users.set(e,u);const t=token(u.id);sessions.set(t,u.id);return{token:t,user:{id:u.id,name:u.name,email:u.email}};
+ const passwordHash=hash(password,salt);
+ const {data,error}=await supabase.from("users").insert({name:name.trim(),email:e,password_hash:passwordHash}).select("id,name,email").single();
+ if(error){
+  if(error.code==="23505")throw new Error("An account with this email already exists");
+  throw error;
+ }
+ return{token:token(data.id),user:{id:data.id,name:data.name,email:data.email}};
 }
-export function login(email:string,password:string){
- const u=users.get(email.trim().toLowerCase());
- if(!u)throw new Error("Invalid email or password");
- const actual=Buffer.from(hash(password,u.passwordSalt),"hex"),expected=Buffer.from(u.passwordHash,"hex");
- if(actual.length!==expected.length||!timingSafeEqual(actual,expected))throw new Error("Invalid email or password");
- const t=token(u.id);sessions.set(t,u.id);return{token:t,user:{id:u.id,name:u.name,email:u.email}};
+
+export async function login(email:string,password:string){
+ const e=email.trim().toLowerCase();
+ const {data,error}=await supabase.from("users").select("id,name,email,password_hash").eq("email",e).maybeSingle();
+ if(error||!data)throw new Error("Invalid email or password");
+ // Password salt is stored alongside the hash in a compact encoded form.
+ // Existing rows created by the old in-memory auth are not in Supabase, so all persisted accounts use this format.
+ const parts=String(data.password_hash).split(":");
+ if(parts.length!==2)throw new Error("Invalid email or password");
+ const actual=hash(password,parts[0]);
+ const expected=Buffer.from(parts[1],"hex");
+ const actualBuf=Buffer.from(actual,"hex");
+ if(actualBuf.length!==expected.length||!timingSafeEqual(actualBuf,expected))throw new Error("Invalid email or password");
+ return{token:token(data.id),user:{id:data.id,name:data.name,email:data.email}};
 }
-export function bearer(req:any){const h=typeof req.headers?.authorization==="string"?req.headers.authorization:"";return h.startsWith("Bearer ")?h.slice(7):undefined}
-export function authenticate(t:string|undefined){
- if(!t)return undefined;const id=sessions.get(t);if(!id)return undefined;
- const raw=Buffer.from(t,"base64url").toString(),parts=raw.split("."),sig=parts[1]??"",expected=createHmac("sha256",secret).update(id).digest("hex");
- if(parts[0]!==id||sig.length!==expected.length||!timingSafeEqual(Buffer.from(sig),Buffer.from(expected)))return undefined;
- for(const u of users.values())if(u.id===id)return{id:u.id,name:u.name,email:u.email};
- return undefined;
+
+export function bearer(req:any){
+ const h=typeof req.headers?.authorization==="string"?req.headers.authorization:"";
+ return h.startsWith("Bearer ")?h.slice(7):undefined;
 }
-export const logout=(t:string|undefined)=>{if(t)sessions.delete(t)};
+
+export async function authenticate(t:string|undefined){
+ if(!t)return undefined;
+ try{
+  const raw=Buffer.from(t,"base64url").toString(),parts=raw.split("."),id=parts[0],sig=parts[1]??"";
+  const expected=createHmac("sha256",process.env.SESSION_SECRET??"meetwise-development-secret").update(id).digest("hex");
+  if(!id||sig.length!==expected.length||!timingSafeEqual(Buffer.from(sig),Buffer.from(expected)))return undefined;
+  const {data}=await supabase.from("users").select("id,name,email").eq("id",id).maybeSingle();
+  return data??undefined;
+ }catch{return undefined}
+}
+
+export const logout=async(_t:string|undefined)=>{};
