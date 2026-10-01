@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
-import { createMeetup,generateInviteCode,getMeetup,getMeetupByCode,getTtlMinutes,saveMeetup } from "../store.js";
+import { createMeetup,generateInviteCode,getMeetup,getMeetupByCode,getTtlMinutes,saveMeetup,saveMemberPreferences,saveChatMessage,saveVote } from "../store.js";
 import { Member,MemberPreferences,Meetup } from "../types.js";
 import { addChatMessage,castVote,updatePreferences } from "../services/meetup.service.js";
 import { generatePlan } from "../services/planner.service.js";
@@ -40,7 +40,8 @@ meetupRouter.patch("/:id/members/:memberId/preferences",async(req,res)=>{
  const m=await getMeetup(req.params.id);if(!m)return res.status(404).json({error:"Meetup not found or expired"});
  try{
   const member=updatePreferences(m,req.params.memberId,req.body as MemberPreferences);
-  await saveMeetup(m);
+  const saved=await saveMemberPreferences(m.id,req.params.memberId,req.body as MemberPreferences);
+  return res.json(saved);
   return res.json(member);
  }catch(e){return res.status(404).json({error:e instanceof Error?e.message:"Member not found"});}
 });
@@ -55,7 +56,7 @@ meetupRouter.post("/:id/chat",async(req,res)=>{
  if(!memberId||!text)return res.status(400).json({error:"memberId and text are required"});
  try{
   const message=addChatMessage(m,memberId,text);
-  await saveMeetup(m);
+  await saveChatMessage(m.id,message);
   // Return the persisted message immediately. AI analysis is requested separately
   // by the client so chat delivery is not blocked by the model response time.
   return res.status(201).json({message,aiAnalysis:{available:false,reason:"Analysis runs asynchronously"}});
@@ -72,7 +73,7 @@ meetupRouter.post("/:id/votes",async(req,res)=>{
  const m=await getMeetup(req.params.id);if(!m)return res.status(404).json({error:"Meetup not found or expired"});
  const memberId=typeof req.body?.memberId==="string"?req.body.memberId:"",optionId=typeof req.body?.optionId==="string"?req.body.optionId:"";
  if(!memberId||!optionId)return res.status(400).json({error:"memberId and optionId are required"});
- try{castVote(m,memberId,optionId);await saveMeetup(m);return res.status(201).json({votes:m.votes});}catch(e){return res.status(403).json({error:e instanceof Error?e.message:"Member does not belong to this meetup"});}
+ try{const votes=castVote(m,memberId,optionId);const latest=votes.find(v=>v.memberId===memberId);if(!latest)throw new Error("Unable to record vote");await saveVote(m.id,latest);return res.status(201).json({votes});}catch(e){return res.status(403).json({error:e instanceof Error?e.message:"Member does not belong to this meetup"});}
 });
 
 meetupRouter.post("/:id/plan",async(req,res)=>{
