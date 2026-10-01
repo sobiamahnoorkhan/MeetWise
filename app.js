@@ -177,7 +177,7 @@ async function refresh(silent = false) {
     if (!S.meetup.finalPlan && allLocated && !S.autoPlanRunning) {
       S.autoPlanRunning = true;
       try {
-        const plan = await api("/live/meetups/" + S.meetup.id + "/plan", {method:"POST", body:JSON.stringify({when:localDateTimeToISO($(\"when\")?.value)})});
+        const plan = await api("/live/meetups/" + S.meetup.id + "/plan", {method:"POST", body:JSON.stringify({when:localDateTimeToISO($("when")?.value)})});
         if (plan?.status === "ready") {
           S.meetup.finalPlan = plan;
           renderPlan(plan);
