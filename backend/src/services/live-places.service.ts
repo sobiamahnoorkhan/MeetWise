@@ -69,11 +69,42 @@ async function nominatim(query:string,area:string,center:Center|undefined,radius
  for(const x of await r.json() as any[]) addResult(results,seen,x,"OpenStreetMap/Nominatim",query,center,radiusKm);
 }
 
+async function photon(center:Center,query:string,radiusKm:number,results:PlaceCandidate[],seen:Set<string>){
+ const u=new URL("https://photon.komoot.io/api/");
+ u.searchParams.set("q",query);
+ u.searchParams.set("lat",String(center.latitude));
+ u.searchParams.set("lon",String(center.longitude));
+ u.searchParams.set("limit","20");
+ try{
+  const r=await fetch(u,{headers:{"User-Agent":"MeetWise-AI/1.0 (group meetup planner)"}});
+  if(!r.ok)return;
+  const data=await r.json() as any;
+  for(const f of data.features??[]){
+   const coords=f.geometry?.coordinates;
+   if(!Array.isArray(coords)||coords.length<2)continue;
+   const p=f.properties??{};
+   addResult(results,seen,{id:f.id||p.osm_id||Math.random(),type:p.osm_value||p.type,name:p.name,lat:coords[1],lon:coords[0],display_name:[p.name,p.street,p.city,p.state].filter(Boolean).join(", "),tags:{website:p.website,phone:p.phone,cuisine:p.cuisine}},"OpenStreetMap/Photon",query,center,radiusKm);
+  }
+ }catch{}
+}
+
 async function overpass(center:Center,radiusKm:number,results:PlaceCandidate[],seen:Set<string>){
  const q=`[out:json][timeout:20];(nwr(around:${Math.round(radiusKm*1000)},${center.latitude},${center.longitude})[amenity~"restaurant|cafe|fast_food|pub|food_court|cinema|theatre"];nwr(around:${Math.round(radiusKm*1000)},${center.latitude},${center.longitude})[leisure~"park|sports_centre|pitch|stadium"];nwr(around:${Math.round(radiusKm*1000)},${center.latitude},${center.longitude})[shop~"mall|supermarket"];);out center tags;`;
  try{
-  const r=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",headers:{"Content-Type":"text/plain","User-Agent":"MeetWise-AI/1.0"},body:q});
-  if(!r.ok)return;
+  const endpoints=[
+   "https://overpass-api.de/api/interpreter",
+   "https://overpass.kumi.systems/api/interpreter",
+   "https://overpass.private.coffee/api/interpreter"
+  ];
+  let response:Response|undefined;
+  for(const endpoint of endpoints){
+   try{
+    const rr=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"text/plain","User-Agent":"MeetWise-AI/1.0"},body:q});
+    if(rr.ok){response=rr;break;}
+   }catch{}
+  }
+  if(!response)return;
+  const r=response;
   const data=await r.json() as any;
   for(const x of data.elements??[]){
    const lat=x.lat??x.center?.lat,lon=x.lon??x.center?.lon;
@@ -92,7 +123,14 @@ export async function findPlaces(area:string,preferences:string[],center?:Center
  }
  // Nominatim is sparse for POI/category searches in some Pakistani areas.
  // Use Overpass as a second OSM source, then widen Nominatim once without bbox if needed.
- if(center && results.length<5) await overpass(center,Math.min(25,Math.max(8,radiusKm*1.5)),results,seen);
+ if(center && results.length<8){
+  const localRadius=Math.min(25,Math.max(8,radiusKm*1.5));
+  for(const q of ["restaurant","cafe","pizza","burger","park","shopping mall","cinema","sports"]){
+   await photon(center,q,localRadius,results,seen);
+   if(results.length>=12)break;
+  }
+  if(results.length<5) await overpass(center,localRadius,results,seen);
+ }
  if(center && results.length<5){
   for(const query of ["restaurant","cafe","park","shopping mall","sports ground","cinema"]){
    try{await nominatim(query,"",undefined,0,results,seen);}catch{}
