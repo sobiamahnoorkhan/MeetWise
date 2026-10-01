@@ -378,26 +378,63 @@ async function sendChat() {
 
 async function analyzeChat(latestMessage) {
   try {
-    const d = await api("/live/meetups/" + S.meetup.id + "/analyze", {method:"POST", body:JSON.stringify({message:latestMessage || undefined})});
-    {
-      let result = d.result;
-      if (typeof result === "string") {
-        try { result = JSON.parse(result); } catch {}
-      }
-      if (result && typeof result === "object") {
-        const reply = result.reply ? "AI: " + result.reply + "\n\n" : "";
-        const constraints = Array.isArray(result.constraints) && result.constraints.length
-          ? "\nConstraints:\n• " + result.constraints.join("\n• ")
-          : "";
-        const conflicts = Array.isArray(result.conflicts) && result.conflicts.length
-          ? "\n\nConflicts:\n• " + result.conflicts.join("\n• ")
-          : "";
-        $("ai").textContent = reply + constraints + conflicts;
-      } else {
-        $("ai").textContent = String(result ?? "");
-      }
+    const d = await api("/live/meetups/" + S.meetup.id + "/analyze", {
+      method:"POST",
+      body:JSON.stringify({message:latestMessage || undefined})
+    });
+    let result = d.result;
+    if (typeof result === "string") {
+      try { result = JSON.parse(result); } catch {}
     }
-  } catch (e) { $("ai").textContent = e.message; }
+    if (result && typeof result === "object") {
+      const reply = result.reply ? "AI: " + result.reply + "\n\n" : "";
+      const constraints = Array.isArray(result.constraints) && result.constraints.length
+        ? "Constraints:\n• " + result.constraints.join("\n• ")
+        : "";
+      const conflicts = Array.isArray(result.conflicts) && result.conflicts.length
+        ? "\n\nConflicts:\n• " + result.conflicts.join("\n• ")
+        : "";
+      $("ai").textContent = reply + constraints + conflicts;
+
+      // Apply only explicit, schema-shaped preference updates returned by the AI.
+      const allowed = new Set(["area","transportMode","budget","foodPreferences","activityPreferences","availableFrom","availableTo","maxTravelMinutes"]);
+      const updates = Array.isArray(result.preferenceUpdates) ? result.preferenceUpdates : [];
+      let applied = 0;
+      for (const item of updates) {
+        if (!item || typeof item.memberName !== "string" || !item.fields || typeof item.fields !== "object") continue;
+        const member = S.meetup.members.find(m => m.name.toLowerCase() === item.memberName.trim().toLowerCase());
+        if (!member) continue;
+        const patch = {};
+        for (const [key,value] of Object.entries(item.fields)) {
+          if (!allowed.has(key)) continue;
+          if (["area","transportMode","availableFrom","availableTo"].includes(key) && typeof value === "string" && value.trim()) patch[key]=value.trim();
+          else if (["budget","maxTravelMinutes"].includes(key) && Number.isFinite(Number(value))) patch[key]=Number(value);
+          else if (["foodPreferences","activityPreferences"].includes(key) && Array.isArray(value)) patch[key]=value.map(String).map(x=>x.trim()).filter(Boolean);
+        }
+        if (Object.keys(patch).length) {
+          await api("/meetups/" + S.meetup.id + "/members/" + member.id + "/preferences", {
+            method:"PATCH", body:JSON.stringify(patch)
+          });
+          applied++;
+        }
+      }
+      if (applied) {
+        await refresh(true);
+        const planTime = $("when")?.value ? localDateTimeToISO($("when").value) : undefined;
+        const replanned = await api("/meetups/" + S.meetup.id + "/replan", {
+          method:"POST",
+          body:JSON.stringify({reason:"AI extracted an explicit constraint from group chat",memberId:S.memberId,when:planTime})
+        });
+        S.meetup.finalPlan = replanned.plan;
+        renderPlan(replanned.plan);
+        $("status").textContent = "AI understood the new constraint and re-planned the meetup.";
+      }
+    } else {
+      $("ai").textContent = String(result ?? "");
+    }
+  } catch (e) {
+    $("ai").textContent = e.message;
+  }
 }
 
 async function logout() {
