@@ -7,7 +7,8 @@ const S = {
   memberId: localStorage.getItem("meetwise_member"),
   candidates: [],
   liveTimer: null,
-  syncing: false
+  syncing: false,
+  prefsDirty: false
 };
 const $ = id => document.getElementById(id);
 const esc = x => String(x ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -84,6 +85,10 @@ function dashboard() {
   $("replan").onclick = replan;
   $("send").onclick = sendChat;
   $("analyze").onclick = analyzeChat;
+  ["area","transport","budget","maxTravel","food","activity","when"].forEach(id => {
+    $(id).addEventListener("input", () => { S.prefsDirty = true; });
+    $(id).addEventListener("change", () => { S.prefsDirty = true; });
+  });
   refresh();
   startLiveSync();
 }
@@ -140,6 +145,7 @@ function renderChat() {
 }
 
 function fillPrefs() {
+  if (S.prefsDirty) return;
   if (!$("area") || !$("transport") || !$("budget") || !$("maxTravel") || !$("food") || !$("activity") || !$("when")) return;
   const m = S.meetup?.members?.find(v => v.id === S.memberId);
   if (!m) return;
@@ -166,6 +172,7 @@ async function savePrefs() {
       availableFrom: $("when").value || undefined
     };
     await api("/meetups/" + S.meetup.id + "/members/" + S.memberId + "/preferences", {method:"PATCH", body:JSON.stringify(p)});
+    S.prefsDirty = false;
     await refresh();
     $("status").textContent = "Preferences saved.";
   } catch (e) { $("status").textContent = e.message; }
