@@ -65,6 +65,7 @@ export async function saveMeetup(meetup: Meetup): Promise<Meetup> {
     invite_code: meetup.inviteCode,
     created_by: null,
     status: "active",
+    scheduled_at: meetup.scheduledAt ?? null,
     expires_at: meetup.expiresAt,
     // Do not overwrite an existing live plan during member/chat/vote updates.
   });
@@ -152,7 +153,8 @@ export async function getMeetup(id: string): Promise<Meetup | undefined> {
       optionId: v.candidate_id,
       createdAt: v.created_at
     })),
-    finalPlan: row.final_plan ?? undefined
+    finalPlan: row.final_plan ?? undefined,
+    scheduledAt: row.scheduled_at ?? undefined
   };
 }
 
