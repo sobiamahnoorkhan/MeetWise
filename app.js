@@ -372,7 +372,24 @@ async function sendChat() {
 async function analyzeChat(latestMessage) {
   try {
     const d = await api("/live/meetups/" + S.meetup.id + "/analyze", {method:"POST", body:JSON.stringify({message:latestMessage || undefined})});
-    $("ai").textContent = typeof d.result === "string" ? d.result : JSON.stringify(d.result, null, 2);
+    {
+      let result = d.result;
+      if (typeof result === "string") {
+        try { result = JSON.parse(result); } catch {}
+      }
+      if (result && typeof result === "object") {
+        const reply = result.reply ? "AI: " + result.reply + "\n\n" : "";
+        const constraints = Array.isArray(result.constraints) && result.constraints.length
+          ? "\nConstraints:\n• " + result.constraints.join("\n• ")
+          : "";
+        const conflicts = Array.isArray(result.conflicts) && result.conflicts.length
+          ? "\n\nConflicts:\n• " + result.conflicts.join("\n• ")
+          : "";
+        $("ai").textContent = reply + constraints + conflicts;
+      } else {
+        $("ai").textContent = String(result ?? "");
+      }
+    }
   } catch (e) { $("ai").textContent = e.message; }
 }
 
