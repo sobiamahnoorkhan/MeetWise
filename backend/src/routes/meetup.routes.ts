@@ -42,7 +42,6 @@ meetupRouter.patch("/:id/members/:memberId/preferences",async(req,res)=>{
   const member=updatePreferences(m,req.params.memberId,req.body as MemberPreferences);
   const saved=await saveMemberPreferences(m.id,req.params.memberId,req.body as MemberPreferences);
   return res.json(saved);
-  return res.json(member);
  }catch(e){return res.status(404).json({error:e instanceof Error?e.message:"Member not found"});}
 });
 
