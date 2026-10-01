@@ -56,9 +56,9 @@ meetupRouter.post("/:id/chat",async(req,res)=>{
  try{
   const message=addChatMessage(m,memberId,text);
   await saveMeetup(m);
-  let aiAnalysis;
-  try{aiAnalysis=await analyzeMeetup(m,text)}catch{aiAnalysis={available:false,reason:"AI analysis unavailable"}}
-  return res.status(201).json({message,aiAnalysis});
+  // Return the persisted message immediately. AI analysis is requested separately
+  // by the client so chat delivery is not blocked by the model response time.
+  return res.status(201).json({message,aiAnalysis:{available:false,reason:"Analysis runs asynchronously"}});
  }catch(e){return res.status(403).json({error:e instanceof Error?e.message:"Member does not belong to this meetup"});}
 });
 
