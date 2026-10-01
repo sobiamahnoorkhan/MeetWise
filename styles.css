@@ -2,3 +2,5 @@
 .map{height:420px;border-radius:14px;overflow:hidden;border:1px solid #e1e6ee}.map+.muted{margin-top:8px}.votingPanel .candidate{background:#fff}.votingPanel button{min-height:44px}
 
 label{display:block;margin-top:10px;font-size:13px}
+
+.mapLink{display:inline-block;margin:8px 8px 0 0;padding:10px 12px;border-radius:10px;background:#edf1f7;color:#172033;text-decoration:none;font-weight:700}.candidate .pill{margin-top:5px}
