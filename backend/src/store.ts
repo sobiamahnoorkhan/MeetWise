@@ -175,6 +175,56 @@ export function getTtlMinutes(): number {
 }
 
 
+
+export async function saveMemberPreferences(meetupId: string, memberId: string, preferences: MemberPreferences): Promise<Member> {
+  const current = await getMeetup(meetupId);
+  if (!current) throw new Error("Meetup not found or expired");
+  const member = current.members.find(m => m.id === memberId);
+  if (!member) throw new Error("Member not found");
+
+  const merged = { ...member.preferences, ...preferences };
+  const row = memberRow(meetupId, { ...member, preferences: merged });
+  const { error } = await supabase.from("meetup_members").update({
+    name: row.name,
+    area: row.area,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    transport_mode: row.transport_mode,
+    budget_min: row.budget_min,
+    budget_max: row.budget_max,
+    food_preferences: row.food_preferences,
+    activity_preferences: row.activity_preferences,
+    availability: row.availability,
+    max_travel_minutes: row.max_travel_minutes
+  }).eq("id", memberId).eq("meetup_id", meetupId);
+  if (error) throw error;
+  return { ...member, preferences: merged };
+}
+
+export async function saveChatMessage(meetupId: string, message: ChatMessage): Promise<void> {
+  const { error } = await supabase.from("messages").insert({
+    id: message.id,
+    meetup_id: meetupId,
+    member_id: message.memberId,
+    message: message.text,
+    created_at: message.createdAt
+  });
+  if (error) throw error;
+}
+
+export async function saveVote(meetupId: string, vote: Vote): Promise<void> {
+  const { error: deleteError } = await supabase.from("votes")
+    .delete().eq("meetup_id", meetupId).eq("member_id", vote.memberId);
+  if (deleteError) throw deleteError;
+  const { error } = await supabase.from("votes").insert({
+    meetup_id: meetupId,
+    member_id: vote.memberId,
+    candidate_id: vote.optionId,
+    created_at: vote.createdAt
+  });
+  if (error) throw error;
+}
+
 export async function saveFinalPlan(meetupId: string, plan: any): Promise<void> {
   const { error } = await supabase.from("meetups").update({ final_plan: plan }).eq("id", meetupId);
   if (error) throw error;
