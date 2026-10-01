@@ -110,7 +110,8 @@ function renderChat() {
 }
 
 function fillPrefs() {
-  const m = S.meetup.members.find(v => v.id === S.memberId);
+  if (!$("area") || !$("transport") || !$("budget") || !$("maxTravel") || !$("food") || !$("activity") || !$("when")) return;
+  const m = S.meetup?.members?.find(v => v.id === S.memberId);
   if (!m) return;
   const p = m.preferences || {};
   $("area").value = p.area || "";
