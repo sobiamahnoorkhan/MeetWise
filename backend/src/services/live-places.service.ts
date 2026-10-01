@@ -148,7 +148,6 @@ export async function findPlaces(area:string,preferences:string[],center?:Center
   const photonRadius=Math.min(25,Math.max(8,radiusKm*1.5));
   for(const q of queries){
    await photon(center,q,photonRadius,results,seen);
-   if(results.length>=18)break;
   }
  }
 
