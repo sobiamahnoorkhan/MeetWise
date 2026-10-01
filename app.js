@@ -1,4 +1,4 @@
-const API=(localStorage.getItem("meetwise_api")||"http://localhost:4000/api").replace(/\/$/,"");
+const API=(localStorage.getItem("meetwise_api")||"https://meetwise-backend.vercel.app/api").replace(/\/$/,"");
 const S={token:localStorage.getItem("meetwise_token"),user:JSON.parse(localStorage.getItem("meetwise_user")||"null"),meetup:null,memberId:localStorage.getItem("meetwise_member")};
 async function api(p,o={}){const h={"Content-Type":"application/json",...(o.headers||{})};if(S.token)h.Authorization="Bearer "+S.token;const r=await fetch(API+p,{...o,headers:h}),d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"Request failed");return d}
 const save=d=>{S.token=d.token;S.user=d.user;localStorage.setItem("meetwise_token",d.token);localStorage.setItem("meetwise_user",JSON.stringify(d.user))};
