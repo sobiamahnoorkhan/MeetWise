@@ -156,9 +156,13 @@ async function refresh(silent = false) {
     renderChat();
     fillPrefs();
     renderLivePreferences();
-    renderVotingPanel();
+    // The researched plan is persisted on the meetup, so every member
+    // renders the same candidates and voting controls after joining.
     if (S.meetup?.finalPlan?.status === "ready" && $("results")) renderPlan(S.meetup.finalPlan);
-    else renderMap();
+    else {
+      renderVotingPanel();
+      renderMap();
+    }
     if (!silent && $("votes")) voteSummary();
     if ($("syncStatus")) $("syncStatus").textContent = "Live sync · " + new Date().toLocaleTimeString();
   } catch (e) { if (!silent && $("status")) $("status").textContent = e.message; }
@@ -332,7 +336,9 @@ function useCurrentLocation() {
 function renderVotingPanel() {
   const el = $("votingPanel");
   if (!el) return;
-  if (!S.candidates.length && S.meetup?.finalPlan?.status === "ready") {
+  // Always rebuild from the server-persisted plan. Do not depend on the
+  // browser that originally performed the research.
+  if (S.meetup?.finalPlan?.status === "ready") {
     S.candidates = (S.meetup.finalPlan.candidates || []).map(x => ({id:x.candidate.id,name:x.candidate.name,address:x.candidate.address||"Address unavailable"}));
   }
   if (!S.candidates.length) {
