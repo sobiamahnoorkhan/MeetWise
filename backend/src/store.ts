@@ -53,7 +53,7 @@ export async function saveMeetup(meetup: Meetup): Promise<Meetup> {
     created_by: null,
     status: "active",
     expires_at: meetup.expiresAt,
-    final_plan: null
+    // Do not overwrite an existing live plan during member/chat/vote updates.
   });
   if (meetupError) throw meetupError;
 
@@ -138,7 +138,8 @@ export async function getMeetup(id: string): Promise<Meetup | undefined> {
       memberId: v.member_id,
       optionId: v.candidate_id,
       createdAt: v.created_at
-    }))
+    })),
+    finalPlan: row.final_plan ?? undefined
   };
 }
 
@@ -159,4 +160,10 @@ export function generateInviteCode(): string {
 
 export function getTtlMinutes(): number {
   return Number.isFinite(ttlMinutes) && ttlMinutes > 0 ? ttlMinutes : 360;
+}
+
+
+export async function saveFinalPlan(meetupId: string, plan: any): Promise<void> {
+  const { error } = await supabase.from("meetups").update({ final_plan: plan }).eq("id", meetupId);
+  if (error) throw error;
 }
