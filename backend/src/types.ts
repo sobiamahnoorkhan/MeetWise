@@ -43,4 +43,5 @@ export interface Meetup {
   members: Member[];
   chat: ChatMessage[];
   votes: Vote[];
+  finalPlan?: any;
 }
