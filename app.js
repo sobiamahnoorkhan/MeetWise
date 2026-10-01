@@ -8,7 +8,8 @@ const S = {
   candidates: [],
   liveTimer: null,
   syncing: false,
-  prefsDirty: false
+  prefsDirty: false,
+  map: null
 };
 const $ = id => document.getElementById(id);
 const esc = x => String(x ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -81,6 +82,7 @@ function dashboard() {
   $("meetupTitle").textContent = S.meetup.title;
   $("invite").innerHTML = "Invite: <b>" + esc(S.meetup.inviteCode) + "</b>";
   $("savePrefs").onclick = savePrefs;
+  $("useLocation").onclick = useCurrentLocation;
   $("research").onclick = research;
   $("replan").onclick = replan;
   $("send").onclick = sendChat;
@@ -244,13 +246,54 @@ function renderPlan(d) {
   $("results").innerHTML = html;
   $("results").querySelectorAll("[data-vote]").forEach(b => b.onclick = () => vote(b.dataset.vote));
   renderVotingPanel();
+  renderMap();
+}
+
+function renderMap() {
+  const el = $("meetupMap");
+  if (!el || typeof L === "undefined") return;
+  if (S.map) S.map.remove();
+  S.map = L.map(el).setView([30.3753, 69.3451], 5);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19, attribution:"© OpenStreetMap contributors"}).addTo(S.map);
+  const points = [];
+  (S.meetup?.members || []).forEach(m => {
+    const p = m.preferences || {};
+    if (Number.isFinite(p.latitude) && Number.isFinite(p.longitude)) {
+      const point=[p.latitude,p.longitude]; points.push(point);
+      L.marker(point).addTo(S.map).bindPopup("<b>"+esc(m.name)+"</b><br>"+esc(p.area||"Member location"));
+    }
+  });
+  (S.meetup?.finalPlan?.candidates || []).forEach(x => {
+    const p=x.candidate;
+    if (p && Number.isFinite(p.latitude) && Number.isFinite(p.longitude)) {
+      const point=[p.latitude,p.longitude]; points.push(point);
+      L.marker(point).addTo(S.map).bindPopup("<b>"+esc(p.name)+"</b><br>"+esc(p.address||""));
+    }
+  });
+  if (points.length) S.map.fitBounds(points,{padding:[25,25]});
+  const status=$("mapStatus");
+  if(status) status.textContent=points.length ? "Member locations and researched meetup places are shown on the map." : "Save an area first, then research live options.";
+}
+
+function useCurrentLocation() {
+  if (!navigator.geolocation) { $("locationStatus").textContent="Browser location is unavailable."; return; }
+  $("locationStatus").textContent="Getting your location...";
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    const lat=pos.coords.latitude, lon=pos.coords.longitude;
+    $("area").value=lat.toFixed(5)+", "+lon.toFixed(5);
+    $("locationStatus").textContent="Location selected. Save preferences.";
+    S.prefsDirty=true;
+  },()=>{$("locationStatus").textContent="Location permission denied or unavailable.";});
 }
 
 function renderVotingPanel() {
   const el = $("votingPanel");
   if (!el) return;
+  if (!S.candidates.length && S.meetup?.finalPlan?.status === "ready") {
+    S.candidates = (S.meetup.finalPlan.candidates || []).map(x => ({id:x.candidate.id,name:x.candidate.name,address:x.candidate.address||"Address unavailable"}));
+  }
   if (!S.candidates.length) {
-    el.innerHTML = "<div class=\"emptyState\">Run live research to create voting options.</div>";
+    el.innerHTML = "<div class=\"emptyState\">Save member locations and run live research to create voting options.</div>";
     return;
   }
   const votes = S.meetup?.votes || [];
