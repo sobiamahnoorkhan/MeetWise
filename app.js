@@ -103,6 +103,15 @@ async function refresh(silent = false) {
   S.syncing = true;
   try {
     S.meetup = await api("/meetups/" + S.meetup.id);
+    // Rebuild voting options from the persisted plan so every group member
+    // sees the same options after refresh/login, not only the member who ran research.
+    if (!S.candidates.length && S.meetup.finalPlan?.status === "ready") {
+      S.candidates = (S.meetup.finalPlan.candidates || []).map(x => ({
+        id: x.candidate.id,
+        name: x.candidate.name,
+        address: x.candidate.address || "Address unavailable"
+      }));
+    }
     renderMembers();
     renderChat();
     fillPrefs();
