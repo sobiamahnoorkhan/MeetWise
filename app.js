@@ -9,7 +9,9 @@ const S = {
   liveTimer: null,
   syncing: false,
   prefsDirty: false,
-  map: null
+  map: null,
+  selectedLocation: null,
+  reminderTimer: null
 };
 const $ = id => document.getElementById(id);
 const esc = x => String(x ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -59,7 +61,7 @@ function home() {
 
 async function createMeetup() {
   try {
-    S.meetup = await api("/meetups", {method:"POST", body:JSON.stringify({title:$("title").value || "Group meetup", organizerName:S.user.name})});
+    S.meetup = await api("/meetups", {method:"POST", body:JSON.stringify({title:$("title").value || "Group meetup", organizerName:S.user.name, scheduledAt:$("scheduledAt").value || undefined})});
     S.memberId = S.meetup.organizerId;
     localStorage.setItem("meetwise_member", S.memberId);
     dashboard();
@@ -78,7 +80,7 @@ async function joinMeetup() {
 }
 
 function dashboard() {
-  app.innerHTML = '<main class="shell"><div class="nav"><div><b class="brand">MeetWise AI</b><div id="meetupTitle" class="muted"></div></div><span id="invite" class="pill"></span></div><div id="meetupReminder" class="muted"></div><div class="grid"><section class="card"><h3>Members</h3><div id="members"></div><h3>Your preferences</h3><input id="area" placeholder="Area / neighborhood"><select id="transport"><option value="">Transport</option><option value="walking">Walking</option><option value="bike">Bike</option><option value="car">Car</option><option value="public_transport">Public transport</option></select><input id="budget" type="number" placeholder="Budget PKR"><input id="maxTravel" type="number" placeholder="Max travel minutes"><input id="food" placeholder="Food preferences"><input id="activity" placeholder="Activity preferences"><input id="when" type="datetime-local"><button id="savePrefs">Save preferences</button><button id="research" class="secondary">Research live options</button><button id="replan" class="secondary">Re-plan</button><p id="status" class="muted"></p></section><section class="card"><h3>Group chat</h3><div id="chat" class="chat"></div><div class="row"><input id="chatText" placeholder="Message or new constraint"><button id="send" style="max-width:120px">Send</button></div><button id="analyze" class="secondary">AI constraint analysis</button><pre id="ai" style="white-space:pre-wrap"></pre></section></div><section class="card" style="margin-top:18px"><h2>Live Group Preferences</h2><div id="livePrefs" class="livePrefs"></div><p id="syncStatus" class="muted">Live sync enabled</p></section><section class="card" style="margin-top:18px"><h2>AI Meetup Plan</h2><div id="results" class="emptyState">Save preferences and run research.</div></section><section class="card" style="margin-top:18px"><h2>Group Voting</h2><div id="votingPanel" class="votingPanel"><div class="emptyState">Run live research to create voting options.</div></div></section></main>';
+  app.innerHTML = '<main class="shell"><div class="nav"><div><b class="brand">MeetWise AI</b><div id="meetupTitle" class="muted"></div></div><span id="invite" class="pill"></span></div><div id="meetupReminder" class="muted"></div><div class="grid"><section class="card"><h3>Members</h3><div id="members"></div><h3>Your preferences</h3><div class="row"><input id="area" placeholder="Area / neighborhood"><button id="useLocation" type="button" class="secondary" style="max-width:150px">Use my location</button></div><p id="locationStatus" class="muted"></p><select id="transport"><option value="">Transport</option><option value="walking">Walking</option><option value="bike">Bike</option><option value="car">Car</option><option value="public_transport">Public transport</option></select><input id="budget" type="number" placeholder="Budget PKR"><input id="maxTravel" type="number" placeholder="Max travel minutes"><input id="food" placeholder="Food preferences"><input id="activity" placeholder="Activity preferences"><input id="when" type="datetime-local"><button id="savePrefs">Save preferences</button><button id="research" class="secondary">Research live options</button><button id="replan" class="secondary">Re-plan</button><p id="status" class="muted"></p></section><section class="card"><h3>Group chat</h3><div id="chat" class="chat"></div><div class="row"><input id="chatText" placeholder="Message or new constraint"><button id="send" style="max-width:120px">Send</button></div><button id="analyze" class="secondary">AI constraint analysis</button><pre id="ai" style="white-space:pre-wrap"></pre></section></div><section class="card" style="margin-top:18px"><h2>Live Group Preferences</h2><div id="livePrefs" class="livePrefs"></div><p id="syncStatus" class="muted">Live sync enabled</p></section><section class="card" style="margin-top:18px"><h2>AI Meetup Plan</h2><div id="results" class="emptyState">Save preferences and run research.</div></section><section class="card" style="margin-top:18px"><h2>Group Voting</h2><div id="votingPanel" class="votingPanel"><div class="emptyState">Run live research to create voting options.</div></div></section></main>';
   $("meetupTitle").textContent = S.meetup.title;
   $("invite").innerHTML = "Invite: <b>" + esc(S.meetup.inviteCode) + "</b>";
   setupMeetupReminder();
@@ -150,7 +152,7 @@ async function refresh(silent = false) {
     fillPrefs();
     renderLivePreferences();
     renderVotingPanel();
-    if (!silent) voteSummary();
+    if (!silent && $("votes")) voteSummary();
     if ($("syncStatus")) $("syncStatus").textContent = "Live sync · " + new Date().toLocaleTimeString();
   } catch (e) { if (!silent && $("status")) $("status").textContent = e.message; }
   finally { S.syncing = false; }
@@ -193,6 +195,11 @@ function fillPrefs() {
   if (!m) return;
   const p = m.preferences || {};
   $("area").value = p.area || "";
+  if (Number.isFinite(p.latitude) && Number.isFinite(p.longitude)) {
+    S.selectedLocation = {latitude:p.latitude, longitude:p.longitude};
+  } else {
+    S.selectedLocation = null;
+  }
   $("transport").value = p.transportMode || "";
   $("budget").value = p.budget ?? "";
   $("maxTravel").value = p.maxTravelMinutes ?? "";
@@ -206,6 +213,7 @@ async function savePrefs() {
     $("status").textContent = "Saving...";
     const p = {
       area: $("area").value.trim(),
+      ...(S.selectedLocation ? {latitude:S.selectedLocation.latitude, longitude:S.selectedLocation.longitude} : {}),
       transportMode: $("transport").value || undefined,
       budget: Number($("budget").value) || undefined,
       maxTravelMinutes: Number($("maxTravel").value) || undefined,
@@ -303,6 +311,7 @@ function useCurrentLocation() {
   navigator.geolocation.getCurrentPosition(async pos=>{
     const lat=pos.coords.latitude, lon=pos.coords.longitude;
     $("area").value=lat.toFixed(5)+", "+lon.toFixed(5);
+    S.selectedLocation = { latitude: lat, longitude: lon };
     $("locationStatus").textContent="Location selected. Save preferences.";
     S.prefsDirty=true;
   },()=>{$("locationStatus").textContent="Location permission denied or unavailable.";});
@@ -356,13 +365,13 @@ async function sendChat() {
     await api("/meetups/" + S.meetup.id + "/chat", {method:"POST", body:JSON.stringify({memberId:S.memberId,text})});
     $("chatText").value = "";
     await refresh();
-    analyzeChat();
+    analyzeChat(text);
   } catch (e) { alert(e.message); }
 }
 
-async function analyzeChat() {
+async function analyzeChat(latestMessage) {
   try {
-    const d = await api("/live/meetups/" + S.meetup.id + "/analyze", {method:"POST"});
+    const d = await api("/live/meetups/" + S.meetup.id + "/analyze", {method:"POST", body:JSON.stringify({message:latestMessage || undefined})});
     $("ai").textContent = typeof d.result === "string" ? d.result : JSON.stringify(d.result, null, 2);
   } catch (e) { $("ai").textContent = e.message; }
 }
