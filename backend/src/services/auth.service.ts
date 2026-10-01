@@ -28,7 +28,7 @@ export async function signup(name:string,email:string,password:string){
    hint:error.hint
   });
   if(error.code==="23505")throw new Error("An account with this email already exists");
-  throw new Error(`Signup database error: ${error.message}`);
+  throw new Error(`Signup database error [${error.code ?? "unknown"}]: ${error.message}${error.details ? ` | details: ${error.details}` : ""}${error.hint ? ` | hint: ${error.hint}` : ""}`);
  }
  if(!data?.id)throw new Error("Signup failed: user record was not returned");
 
