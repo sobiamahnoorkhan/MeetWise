@@ -15,6 +15,7 @@ export interface MemberPreferences {
 
 export interface Member {
   id: string;
+  userId?: string;
   name: string;
   joinedAt: string;
   preferences: MemberPreferences;
