@@ -1,1 +1,30 @@
-<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MeetWise AI</title><link rel="stylesheet" href="./styles.css"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></head><body><div id="app"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="./app.js"></script></body></html>
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MeetWise AI</title>
+<link rel="stylesheet" href="./styles.css?v=20261002">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body>
+<div id="app"><main class="shell"><div class="card"><h1>MeetWise AI</h1><p>Loading...</p></div></main></div>
+<script>
+window.addEventListener("error", function(e){
+  var app=document.getElementById("app");
+  if(app && e.message){
+    app.innerHTML='<main class="shell"><div class="card errorBox"><h2>MeetWise could not load</h2><p>'+String(e.message).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]||c})+'</p><p class="muted">Refresh the page. If this continues, the current deployment may not have loaded the latest app files.</p></div></main>';
+  }
+});
+window.addEventListener("unhandledrejection", function(e){
+  var app=document.getElementById("app");
+  var msg=e.reason && e.reason.message ? e.reason.message : String(e.reason || "Unknown error");
+  if(app && !app.innerHTML.trim()){
+    app.innerHTML='<main class="shell"><div class="card errorBox"><h2>MeetWise could not start</h2><p>'+msg.replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]||c})+'</p></div></main>';
+  }
+});
+</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="./app.js?v=20261002"></script>
+</body>
+</html>
