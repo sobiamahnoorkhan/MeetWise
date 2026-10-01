@@ -6,15 +6,32 @@ const secret=()=>process.env.SESSION_SECRET??"meetwise-development-secret";
 const token=(id:string)=>Buffer.from(id+"."+createHmac("sha256",secret()).update(id).digest("hex")).toString("base64url");
 
 export async function signup(name:string,email:string,password:string){
+ const n=name.trim();
  const e=email.trim().toLowerCase();
+ if(!n||!e||!password)throw new Error("Name, email and password are required");
  if(password.length<8)throw new Error("Password must be at least 8 characters");
+
  const salt=randomBytes(16).toString("hex");
  const encodedHash=salt+":"+hash(password,salt);
- const {data,error}=await supabase.from("users").insert({name:name.trim(),email:e,password_hash:encodedHash}).select("id,name,email").single();
+
+ const {data,error}=await supabase
+  .from("users")
+  .insert({name:n,email:e,password_hash:encodedHash})
+  .select("id,name,email")
+  .single();
+
  if(error){
+  console.error("Supabase signup error:",{
+   code:error.code,
+   message:error.message,
+   details:error.details,
+   hint:error.hint
+  });
   if(error.code==="23505")throw new Error("An account with this email already exists");
-  throw error;
+  throw new Error(`Signup database error: ${error.message}`);
  }
+ if(!data?.id)throw new Error("Signup failed: user record was not returned");
+
  return{token:token(data.id),user:{id:data.id,name:data.name,email:data.email}};
 }
 
