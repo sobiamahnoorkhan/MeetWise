@@ -8,7 +8,33 @@ import {liveRouter} from "./routes/live.routes.js";
 import {authRouter} from "./routes/auth.routes.js";
 
 export const app=express();
-app.use(cors({origin:process.env.CORS_ORIGIN?.split(",").map(v=>v.trim())??true}));
+
+const allowedOrigins=(process.env.CORS_ORIGIN??"")
+  .split(",")
+  .map(v=>v.trim().replace(/\/$/,""))
+  .filter(Boolean);
+
+app.use(cors({
+  origin:(origin,callback)=>{
+    if(!origin || allowedOrigins.length===0 || allowedOrigins.includes(origin)) return callback(null,true);
+    return callback(new Error("CORS origin not allowed"));
+  },
+  methods:["GET","POST","PATCH","PUT","DELETE","OPTIONS"],
+  allowedHeaders:["Content-Type","Authorization"],
+  credentials:false,
+  optionsSuccessStatus:204
+}));
+app.options("*",cors({
+  origin:(origin,callback)=>{
+    if(!origin || allowedOrigins.length===0 || allowedOrigins.includes(origin)) return callback(null,true);
+    return callback(new Error("CORS origin not allowed"));
+  },
+  methods:["GET","POST","PATCH","PUT","DELETE","OPTIONS"],
+  allowedHeaders:["Content-Type","Authorization"],
+  credentials:false,
+  optionsSuccessStatus:204
+}));
+
 app.use(express.json({limit:"1mb"}));
 
 app.get("/api/health",async(_req,res)=>{
