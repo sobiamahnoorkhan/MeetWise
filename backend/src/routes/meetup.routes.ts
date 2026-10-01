@@ -6,6 +6,7 @@ import { addChatMessage,castVote,updatePreferences } from "../services/meetup.se
 import { generatePlan } from "../services/planner.service.js";
 import { replanMeetup } from "../services/replan.service.js";
 import { analyzeMeetup } from "../services/gemini.service.js";
+import { authenticate,bearer } from "../services/auth.service.js";
 export const meetupRouter=Router();
 
 meetupRouter.post("/",async(req,res)=>{
@@ -14,7 +15,10 @@ meetupRouter.post("/",async(req,res)=>{
  const scheduledAt=typeof req.body?.scheduledAt==="string"&&req.body.scheduledAt?new Date(req.body.scheduledAt).toISOString():undefined;
  if(!title||!organizerName)return res.status(400).json({error:"title and organizerName are required"});
  const now=new Date(),organizerId=randomUUID();
- const meetup:Meetup={id:randomUUID(),inviteCode:generateInviteCode(),title,organizerId,createdAt:now.toISOString(),scheduledAt,expiresAt:new Date(now.getTime()+getTtlMinutes()*60000).toISOString(),members:[{id:organizerId,name:organizerName,joinedAt:now.toISOString(),preferences:{}}],chat:[],votes:[]};
+ const authUser=await authenticate(bearer(req));
+ const expiryBase=scheduledAt?new Date(scheduledAt).getTime():now.getTime();
+ const expiresAt=new Date(Math.max(now.getTime()+getTtlMinutes()*60000,expiryBase+24*60*60*1000)).toISOString();
+ const meetup:Meetup={id:randomUUID(),inviteCode:generateInviteCode(),title,organizerId,createdAt:now.toISOString(),scheduledAt,expiresAt,members:[{id:organizerId,userId:authUser?.id,name:organizerName,joinedAt:now.toISOString(),preferences:{}}],chat:[],votes:[]};
  try{return res.status(201).json(await createMeetup(meetup));}catch(e){console.error(e);return res.status(500).json({error:"Unable to create meetup"});}
 });
 
@@ -32,7 +36,8 @@ meetupRouter.post("/:id/join",async(req,res)=>{
  const m=await getMeetup(req.params.id);if(!m)return res.status(404).json({error:"Meetup not found or expired"});
  const name=typeof req.body?.name==="string"?req.body.name.trim():"",code=typeof req.body?.inviteCode==="string"?req.body.inviteCode.trim().toUpperCase():"";
  if(!name||code!==m.inviteCode)return res.status(400).json({error:"Valid name and invite code are required"});
- const member:Member={id:randomUUID(),name,joinedAt:new Date().toISOString(),preferences:{}};
+ const authUser=await authenticate(bearer(req));
+ const member:Member={id:randomUUID(),userId:authUser?.id,name,joinedAt:new Date().toISOString(),preferences:{}};
  m.members.push(member);
  try{await saveMeetup(m);return res.status(201).json(member);}catch(e){console.error(e);return res.status(500).json({error:"Unable to save meetup member"});}
 });
