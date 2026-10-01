@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 import { Meetup, Member, MemberPreferences, ChatMessage, Vote } from "./types.js";
 import { supabase } from "./db.js";
+import { geocode } from "./services/geocoding.service.js";
 
 const ttlMinutes = Number(process.env.MEETUP_TTL_MINUTES ?? 360);
 
@@ -182,7 +183,11 @@ export async function saveMemberPreferences(meetupId: string, memberId: string, 
   const member = current.members.find(m => m.id === memberId);
   if (!member) throw new Error("Member not found");
 
-  const merged = { ...member.preferences, ...preferences };
+  let merged = { ...member.preferences, ...preferences };
+  if (merged.area && (merged.latitude === undefined || merged.longitude === undefined)) {
+    const point = await geocode(merged.area);
+    if (point) merged = { ...merged, latitude: point.latitude, longitude: point.longitude };
+  }
   const row = memberRow(meetupId, { ...member, preferences: merged });
   const { error } = await supabase.from("meetup_members").update({
     name: row.name,
