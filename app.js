@@ -176,6 +176,7 @@ async function research() {
     $("status").textContent = "Researching live places, travel and weather...";
     $("results").innerHTML = '<div class="loading">Researching...</div>';
     const d = await api("/live/meetups/" + S.meetup.id + "/plan", {method:"POST", body:JSON.stringify({when:$("when").value || undefined})});
+    S.meetup.finalPlan = d;
     renderPlan(d);
   } catch (e) { $("results").innerHTML = '<div class="errorBox">' + esc(e.message) + "</div>"; }
 }
@@ -184,6 +185,7 @@ async function replan() {
   try {
     $("status").textContent = "Re-planning...";
     const d = await api("/meetups/" + S.meetup.id + "/replan", {method:"POST", body:JSON.stringify({reason:"A member changed a constraint",memberId:S.memberId,when:$("when").value || undefined})});
+    S.meetup.finalPlan = d.plan;
     renderPlan(d.plan);
     $("status").textContent = "Re-plan complete.";
   } catch (e) { $("results").innerHTML = '<div class="errorBox">' + esc(e.message) + "</div>"; }
