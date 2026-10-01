@@ -297,10 +297,12 @@ function renderPlan(d) {
   if (d.center) html += '<p class="muted"><b>Fair meeting center:</b> ' + Number(d.center.latitude).toFixed(4) + ", " + Number(d.center.longitude).toFixed(4) + ' · candidates are searched around the shared center.</p>';
   html += '<p class="muted">' + esc(d.objective || "") + "</p>";
   (d.candidates || []).forEach((x, i) => {
-    const travel = (x.travel || []).map(t => {
-      const m = S.meetup.members.find(v => v.id === t.memberId);
-      return '<span class="pill">' + esc(m?.name || "Member") + ": " + (t.durationMinutes ?? "unknown") + " min</span>";
+    const travel = (x.travelByMember || x.travel || []).map(t => {
+      const name = t.memberName || S.meetup.members.find(v => v.id === t.memberId)?.name || "Member";
+      const distance = Number.isFinite(t.distanceMeters) ? " · " + (t.distanceMeters / 1000).toFixed(1) + " km" : "";
+      return '<span class="pill">' + esc(name) + ": " + (t.durationMinutes ?? "unknown") + " min" + distance + "</span>";
     }).join("");
+    const preferenceCoverage = Array.isArray(x.preferenceMatches) ? x.preferenceMatches.map(m => esc(m.memberName) + ": " + ((m.matched || []).join(", ") || "no exact match")).join(" · ") : "";
     const weather = x.weather?.available ? '<p class="weather"><b>Weather:</b> ' + esc(x.weather.summary || "Forecast available") + "</p>" : "";
     const fairness = '<p><span class="pill">Fairness: ' + (x.fairnessScore ?? "unavailable") + '%</span><span class="pill">Longest trip: ' + (x.maxTravelMinutes ?? "unknown") + ' min</span><span class="pill">Total travel: ' + (x.totalTravelMinutes ?? "unknown") + ' min</span></p>';
     const availability = '<p class="muted"><b>Venue verification:</b> ' + esc(x.availabilityStatus || "Opening/availability not verified") + '</p>';
