@@ -248,7 +248,7 @@ async function research() {
 async function replan() {
   try {
     $("status").textContent = "Re-planning...";
-    const d = await api("/meetups/" + S.meetup.id + "/replan", {method:"POST", body:JSON.stringify({reason:"A member changed a constraint",memberId:S.memberId,when:$("when").value || undefined})});
+    const d = await api("/meetups/" + S.meetup.id + "/replan", {method:"POST", body:JSON.stringify({reason:"A member changed a constraint",memberId:S.memberId,when:localDateTimeToISO($("when").value)})});
     S.meetup.finalPlan = d.plan;
     renderPlan(d.plan);
     $("status").textContent = "Re-plan complete.";
@@ -270,6 +270,7 @@ function renderPlan(d) {
     return;
   }
   let html = '<div class="planMeta"><span class="pill">Goal: ' + esc(d.goal) + '</span><span class="pill">Source: ' + esc(d.source) + "</span></div>";
+  if (d.center) html += '<p class="muted"><b>Fair meeting center:</b> ' + Number(d.center.latitude).toFixed(4) + ", " + Number(d.center.longitude).toFixed(4) + ' · candidates are searched around the shared center.</p>';
   html += '<p class="muted">' + esc(d.objective || "") + "</p>";
   (d.candidates || []).forEach((x, i) => {
     const travel = (x.travel || []).map(t => {
@@ -277,7 +278,8 @@ function renderPlan(d) {
       return '<span class="pill">' + esc(m?.name || "Member") + ": " + (t.durationMinutes ?? "unknown") + " min</span>";
     }).join("");
     const weather = x.weather?.available ? '<p class="weather"><b>Weather:</b> ' + esc(x.weather.summary || "Forecast available") + "</p>" : "";
-    html += '<div class="candidate"><div class="score">Option ' + (i + 1) + " · " + (x.score === null ? "Verified score unavailable" : x.score + "% verified constraints") + "</div><h3>" + esc(x.candidate.name) + '</h3><p class="muted">' + esc(x.candidate.address || "Address unavailable") + "</p><p>" + travel + "</p>" + weather + "<p>" + (x.explanation || []).map(esc).join(" · ") + '</p><p class="muted">' + esc(x.budgetStatus || "Budget not verified") + '</p><button data-vote="' + esc(x.candidate.id) + '">Vote for this option</button></div>';
+    const fairness = '<p><span class="pill">Longest trip: ' + (x.maxTravelMinutes ?? "unknown") + ' min</span><span class="pill">Average trip: ' + (x.averageTravelMinutes ?? "unknown") + ' min</span></p>';
+    html += '<div class="candidate"><div class="score">Option ' + (i + 1) + " · " + (x.score === null ? "Verified score unavailable" : x.score + "% verified constraints") + "</div><h3>" + esc(x.candidate.name) + '</h3><p class="muted">' + esc(x.candidate.address || "Address unavailable") + "</p><p>" + travel + "</p>" + fairness + weather + "<p>" + (x.explanation || []).map(esc).join(" · ") + '</p><p class="muted">' + esc(x.budgetStatus || "Budget not verified") + '</p><button data-vote="' + esc(x.candidate.id) + '">Vote for this option</button></div>';
   });
   S.candidates = (d.candidates || []).map(x => ({id:x.candidate.id, name:x.candidate.name, address:x.candidate.address || "Address unavailable"}));
   $("results").innerHTML = html;
