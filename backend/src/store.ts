@@ -1,31 +1,155 @@
 import { randomInt } from "node:crypto";
-import { Meetup } from "./types.js";
-
-const meetups = new Map<string, Meetup>();
+import { Meetup, Member } from "./types.js";
+import { supabase } from "./db.js";
 
 const ttlMinutes = Number(process.env.MEETUP_TTL_MINUTES ?? 360);
 
-export function createMeetup(meetup: Meetup): Meetup {
-  meetups.set(meetup.id, meetup);
+const memberRow = (meetupId: string, m: Member) => ({
+  id: m.id,
+  meetup_id: meetupId,
+  user_id: null,
+  name: m.name,
+  area: m.preferences.area ?? null,
+  latitude: m.preferences.latitude ?? null,
+  longitude: m.preferences.longitude ?? null,
+  transport_mode: m.preferences.transportMode ?? null,
+  budget_min: m.preferences.budget ?? null,
+  budget_max: m.preferences.budget ?? null,
+  food_preferences: m.preferences.foodPreferences ?? [],
+  activity_preferences: m.preferences.activityPreferences ?? [],
+  availability: m.preferences.availableFrom && m.preferences.availableTo
+    ? `${m.preferences.availableFrom}-${m.preferences.availableTo}`
+    : null,
+  max_travel_minutes: m.preferences.maxTravelMinutes ?? null,
+  joined_at: m.joinedAt
+});
+
+const toMember = (r: any): Member => {
+  const [availableFrom, availableTo] = String(r.availability ?? "").split("-");
+  return {
+    id: r.id,
+    name: r.name,
+    joinedAt: r.joined_at,
+    preferences: {
+      area: r.area ?? undefined,
+      latitude: r.latitude ?? undefined,
+      longitude: r.longitude ?? undefined,
+      transportMode: r.transport_mode ?? undefined,
+      budget: r.budget_min ?? r.budget_max ?? undefined,
+      foodPreferences: r.food_preferences ?? [],
+      activityPreferences: r.activity_preferences ?? [],
+      availableFrom: availableFrom || undefined,
+      availableTo: availableTo || undefined,
+      maxTravelMinutes: r.max_travel_minutes ?? undefined
+    }
+  };
+};
+
+export async function saveMeetup(meetup: Meetup): Promise<Meetup> {
+  const { error: meetupError } = await supabase.from("meetups").upsert({
+    id: meetup.id,
+    title: meetup.title,
+    invite_code: meetup.inviteCode,
+    created_by: null,
+    status: "active",
+    expires_at: meetup.expiresAt,
+    final_plan: null
+  });
+  if (meetupError) throw meetupError;
+
+  const { error: deleteMembersError } = await supabase
+    .from("meetup_members")
+    .delete()
+    .eq("meetup_id", meetup.id);
+  if (deleteMembersError) throw deleteMembersError;
+
+  const { error: membersError } = await supabase
+    .from("meetup_members")
+    .insert(meetup.members.map(m => memberRow(meetup.id, m)));
+  if (membersError) throw membersError;
+
+  const { error: deleteMessagesError } = await supabase
+    .from("messages")
+    .delete()
+    .eq("meetup_id", meetup.id);
+  if (deleteMessagesError) throw deleteMessagesError;
+
+  if (meetup.chat.length) {
+    const { error } = await supabase.from("messages").insert(
+      meetup.chat.map(m => ({
+        id: m.id,
+        meetup_id: meetup.id,
+        member_id: m.memberId,
+        message: m.text,
+        created_at: m.createdAt
+      }))
+    );
+    if (error) throw error;
+  }
+
+  const { error: deleteVotesError } = await supabase
+    .from("votes")
+    .delete()
+    .eq("meetup_id", meetup.id);
+  if (deleteVotesError) throw deleteVotesError;
+
+  if (meetup.votes.length) {
+    const { error } = await supabase.from("votes").insert(
+      meetup.votes.map(v => ({
+        meetup_id: meetup.id,
+        member_id: v.memberId,
+        candidate_id: v.optionId,
+        created_at: v.createdAt
+      }))
+    );
+    if (error) throw error;
+  }
+
   return meetup;
 }
 
-export function getMeetup(id: string): Meetup | undefined {
-  return meetups.get(id);
+export async function createMeetup(meetup: Meetup): Promise<Meetup> {
+  return saveMeetup(meetup);
 }
 
-export function getMeetupByCode(code: string): Meetup | undefined {
+export async function getMeetup(id: string): Promise<Meetup | undefined> {
+  const { data: row, error } = await supabase.from("meetups").select("*").eq("id", id).maybeSingle();
+  if (error || !row) return undefined;
+
+  const { data: members } = await supabase.from("meetup_members").select("*").eq("meetup_id", id).order("joined_at");
+  const { data: messages } = await supabase.from("messages").select("*").eq("meetup_id", id).order("created_at");
+  const { data: votes } = await supabase.from("votes").select("*").eq("meetup_id", id).order("created_at");
+
+  return {
+    id: row.id,
+    inviteCode: row.invite_code,
+    title: row.title,
+    organizerId: members?.[0]?.id ?? "",
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    members: (members ?? []).map(toMember),
+    chat: (messages ?? []).map((m: any) => ({
+      id: m.id,
+      memberId: m.member_id,
+      text: m.message,
+      createdAt: m.created_at
+    })),
+    votes: (votes ?? []).map((v: any) => ({
+      memberId: v.member_id,
+      optionId: v.candidate_id,
+      createdAt: v.created_at
+    }))
+  };
+}
+
+export async function getMeetupByCode(code: string): Promise<Meetup | undefined> {
   const normalized = code.trim().toUpperCase();
-  return [...meetups.values()].find((m) => m.inviteCode === normalized);
+  const { data: row } = await supabase.from("meetups").select("id").eq("invite_code", normalized).maybeSingle();
+  return row ? getMeetup(row.id) : undefined;
 }
 
-export function deleteExpiredMeetups(): void {
-  const now = Date.now();
-  for (const [id, meetup] of meetups) {
-    if (new Date(meetup.expiresAt).getTime() <= now) {
-      meetups.delete(id);
-    }
-  }
+export async function deleteExpiredMeetups(): Promise<void> {
+  await supabase.from("meetups").delete().lte("expires_at", new Date().toISOString());
 }
 
 export function generateInviteCode(): string {
