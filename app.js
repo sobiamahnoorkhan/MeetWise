@@ -4,7 +4,10 @@ const S = {
   token: localStorage.getItem("meetwise_token"),
   user: JSON.parse(localStorage.getItem("meetwise_user") || "null"),
   meetup: null,
-  memberId: localStorage.getItem("meetwise_member")
+  memberId: localStorage.getItem("meetwise_member"),
+  candidates: [],
+  liveTimer: null,
+  syncing: false
 };
 const $ = id => document.getElementById(id);
 const esc = x => String(x ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -73,7 +76,7 @@ async function joinMeetup() {
 }
 
 function dashboard() {
-  app.innerHTML = '<main class="shell"><div class="nav"><div><b class="brand">MeetWise AI</b><div id="meetupTitle" class="muted"></div></div><span id="invite" class="pill"></span></div><div class="grid"><section class="card"><h3>Members</h3><div id="members"></div><h3>Your preferences</h3><input id="area" placeholder="Area / neighborhood"><select id="transport"><option value="">Transport</option><option value="walking">Walking</option><option value="bike">Bike</option><option value="car">Car</option><option value="public_transport">Public transport</option></select><input id="budget" type="number" placeholder="Budget PKR"><input id="maxTravel" type="number" placeholder="Max travel minutes"><input id="food" placeholder="Food preferences"><input id="activity" placeholder="Activity preferences"><input id="when" type="datetime-local"><button id="savePrefs">Save preferences</button><button id="research" class="secondary">Research live options</button><button id="replan" class="secondary">Re-plan</button><p id="status" class="muted"></p></section><section class="card"><h3>Group chat</h3><div id="chat" class="chat"></div><div class="row"><input id="chatText" placeholder="Message or new constraint"><button id="send" style="max-width:120px">Send</button></div><button id="analyze" class="secondary">AI constraint analysis</button><pre id="ai" style="white-space:pre-wrap"></pre></section></div><section class="card" style="margin-top:18px"><h2>AI Meetup Plan</h2><div id="results" class="emptyState">Save preferences and run research.</div><div id="votes" class="muted"></div></section></main>';
+  app.innerHTML = '<main class="shell"><div class="nav"><div><b class="brand">MeetWise AI</b><div id="meetupTitle" class="muted"></div></div><span id="invite" class="pill"></span></div><div class="grid"><section class="card"><h3>Members</h3><div id="members"></div><h3>Your preferences</h3><input id="area" placeholder="Area / neighborhood"><select id="transport"><option value="">Transport</option><option value="walking">Walking</option><option value="bike">Bike</option><option value="car">Car</option><option value="public_transport">Public transport</option></select><input id="budget" type="number" placeholder="Budget PKR"><input id="maxTravel" type="number" placeholder="Max travel minutes"><input id="food" placeholder="Food preferences"><input id="activity" placeholder="Activity preferences"><input id="when" type="datetime-local"><button id="savePrefs">Save preferences</button><button id="research" class="secondary">Research live options</button><button id="replan" class="secondary">Re-plan</button><p id="status" class="muted"></p></section><section class="card"><h3>Group chat</h3><div id="chat" class="chat"></div><div class="row"><input id="chatText" placeholder="Message or new constraint"><button id="send" style="max-width:120px">Send</button></div><button id="analyze" class="secondary">AI constraint analysis</button><pre id="ai" style="white-space:pre-wrap"></pre></section></div><section class="card" style="margin-top:18px"><h2>Live Group Preferences</h2><div id="livePrefs" class="livePrefs"></div><p id="syncStatus" class="muted">Live sync enabled</p></section><section class="card" style="margin-top:18px"><h2>AI Meetup Plan</h2><div id="results" class="emptyState">Save preferences and run research.</div></section><section class="card" style="margin-top:18px"><h2>Group Voting</h2><div id="votingPanel" class="votingPanel"><div class="emptyState">Run live research to create voting options.</div></div></section></main>';
   $("meetupTitle").textContent = S.meetup.title;
   $("invite").innerHTML = "Invite: <b>" + esc(S.meetup.inviteCode) + "</b>";
   $("savePrefs").onclick = savePrefs;
@@ -82,16 +85,28 @@ function dashboard() {
   $("send").onclick = sendChat;
   $("analyze").onclick = analyzeChat;
   refresh();
+  startLiveSync();
 }
 
-async function refresh() {
+function startLiveSync() {
+  if (S.liveTimer) clearInterval(S.liveTimer);
+  S.liveTimer = setInterval(() => refresh(true), 1500);
+}
+
+async function refresh(silent = false) {
+  if (S.syncing || !S.meetup?.id) return;
+  S.syncing = true;
   try {
     S.meetup = await api("/meetups/" + S.meetup.id);
     renderMembers();
     renderChat();
     fillPrefs();
-    voteSummary();
-  } catch (e) { if ($("status")) $("status").textContent = e.message; }
+    renderLivePreferences();
+    renderVotingPanel();
+    if (!silent) voteSummary();
+    if ($("syncStatus")) $("syncStatus").textContent = "Live sync · " + new Date().toLocaleTimeString();
+  } catch (e) { if (!silent && $("status")) $("status").textContent = e.message; }
+  finally { S.syncing = false; }
 }
 
 function renderMembers() {
@@ -100,6 +115,21 @@ function renderMembers() {
     const ready = !!(p.area || (p.foodPreferences || []).length || (p.activityPreferences || []).length);
     return '<span class="pill ' + (ready ? "pillReady" : "") + '">' + esc(m.name) + (ready ? " ✓" : " · pending") + "</span>";
   }).join("");
+}
+
+function renderLivePreferences() {
+  const el = $("livePrefs");
+  if (!el || !S.meetup?.members) return;
+  el.innerHTML = S.meetup.members.map(m => {
+    const p = m.preferences || {};
+    const foods = (p.foodPreferences || []).join(", ") || "—";
+    const activities = (p.activityPreferences || []).join(", ") || "—";
+    const transport = p.transportMode || "—";
+    const budget = p.budget ? "PKR " + p.budget : "—";
+    const travel = p.maxTravelMinutes ? p.maxTravelMinutes + " min" : "—";
+    const when = p.availableFrom ? new Date(p.availableFrom).toLocaleString() : "—";
+    return `<div class="candidate"><div><b>${esc(m.name)}</b> ${m.id === S.memberId ? "<span class=\"pill pillReady\">You</span>" : ""}</div><p class="muted">Area: ${esc(p.area || "—")} · Transport: ${esc(transport)} · Budget: ${esc(budget)} · Max travel: ${esc(travel)}</p><p>Food: ${esc(foods)} · Activity: ${esc(activities)}</p><p class="muted">Availability: ${esc(when)}</p></div>`;
+  }).join("") || "<div class=\"emptyState\">No members yet.</div>";
 }
 
 function renderChat() {
@@ -182,8 +212,27 @@ function renderPlan(d) {
     const weather = x.weather?.available ? '<p class="weather"><b>Weather:</b> ' + esc(x.weather.summary || "Forecast available") + "</p>" : "";
     html += '<div class="candidate"><div class="score">Option ' + (i + 1) + " · " + (x.score === null ? "Verified score unavailable" : x.score + "% verified constraints") + "</div><h3>" + esc(x.candidate.name) + '</h3><p class="muted">' + esc(x.candidate.address || "Address unavailable") + "</p><p>" + travel + "</p>" + weather + "<p>" + (x.explanation || []).map(esc).join(" · ") + '</p><p class="muted">' + esc(x.budgetStatus || "Budget not verified") + '</p><button data-vote="' + esc(x.candidate.id) + '">Vote for this option</button></div>';
   });
+  S.candidates = (d.candidates || []).map(x => ({id:x.candidate.id, name:x.candidate.name, address:x.candidate.address || "Address unavailable"}));
   $("results").innerHTML = html;
   $("results").querySelectorAll("[data-vote]").forEach(b => b.onclick = () => vote(b.dataset.vote));
+  renderVotingPanel();
+}
+
+function renderVotingPanel() {
+  const el = $("votingPanel");
+  if (!el) return;
+  if (!S.candidates.length) {
+    el.innerHTML = "<div class=\"emptyState\">Run live research to create voting options.</div>";
+    return;
+  }
+  const votes = S.meetup?.votes || [];
+  const totalMembers = S.meetup?.members?.length || 0;
+  el.innerHTML = S.candidates.map(c => {
+    const count = votes.filter(v => v.optionId === c.id).length;
+    const mine = votes.some(v => v.memberId === S.memberId && v.optionId === c.id);
+    return `<div class="candidate"><div class="score">${count} vote${count === 1 ? "" : "s"} · ${totalMembers ? Math.round(count / totalMembers * 100) : 0}% of members</div><h3>${esc(c.name)}</h3><p class="muted">${esc(c.address)}</p><button data-panel-vote="${esc(c.id)}">${mine ? "✓ Your vote" : "Vote for this option"}</button></div>`;
+  }).join("");
+  el.querySelectorAll("[data-panel-vote]").forEach(b => b.onclick = () => vote(b.dataset.panelVote));
 }
 
 async function vote(id) {
@@ -205,10 +254,10 @@ async function sendChat() {
   const text = $("chatText").value.trim();
   if (!text) return;
   try {
-    const d = await api("/meetups/" + S.meetup.id + "/chat", {method:"POST", body:JSON.stringify({memberId:S.memberId,text})});
+    await api("/meetups/" + S.meetup.id + "/chat", {method:"POST", body:JSON.stringify({memberId:S.memberId,text})});
     $("chatText").value = "";
-    if (d.aiAnalysis?.available) $("ai").textContent = typeof d.aiAnalysis.result === "string" ? d.aiAnalysis.result : JSON.stringify(d.aiAnalysis.result, null, 2);
     await refresh();
+    analyzeChat();
   } catch (e) { alert(e.message); }
 }
 
@@ -220,6 +269,7 @@ async function analyzeChat() {
 }
 
 async function logout() {
+  if (S.liveTimer) clearInterval(S.liveTimer);
   try { await api("/auth/logout", {method:"POST"}); } catch {}
   localStorage.clear();
   location.reload();
