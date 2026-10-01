@@ -11,7 +11,8 @@ const S = {
   prefsDirty: false,
   map: null,
   selectedLocation: null,
-  reminderTimer: null
+  reminderTimer: null,
+  autoPlanRunning: false
 };
 const $ = id => document.getElementById(id);
 const esc = x => String(x ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -133,7 +134,11 @@ async function refresh(silent = false) {
   if (S.syncing || !S.meetup?.id) return;
   S.syncing = true;
   try {
+    const previousPlan = S.meetup?.finalPlan;
     S.meetup = await api("/meetups/" + S.meetup.id);
+    // Keep a ready plan already held by this browser if an older backend
+    // response does not include final_plan yet.
+    if (!S.meetup.finalPlan && previousPlan?.status === "ready") S.meetup.finalPlan = previousPlan;
     // Recover a stale local member id after refresh/account switching.
     // The active member must always be one of this meetup's persisted members.
     if (!S.meetup.members.some(m => m.id === S.memberId)) {
@@ -165,6 +170,21 @@ async function refresh(silent = false) {
     }
     if (!silent && $("votes")) voteSummary();
     if ($("syncStatus")) $("syncStatus").textContent = "Live sync · " + new Date().toLocaleTimeString();
+    // If an existing meetup has no persisted plan, recover it once from the
+    // server. This makes researched options available to members who join on
+    // another browser/account even if an older deployment did not persist the plan.
+    const allLocated = S.meetup.members.length > 0 && S.meetup.members.every(m => Number.isFinite(m.preferences?.latitude) && Number.isFinite(m.preferences?.longitude));
+    if (!S.meetup.finalPlan && allLocated && !S.autoPlanRunning) {
+      S.autoPlanRunning = true;
+      try {
+        const plan = await api("/live/meetups/" + S.meetup.id + "/plan", {method:"POST", body:JSON.stringify({when:localDateTimeToISO($(\"when\")?.value)})});
+        if (plan?.status === "ready") {
+          S.meetup.finalPlan = plan;
+          renderPlan(plan);
+        }
+      } catch {}
+      finally { S.autoPlanRunning = false; }
+    }
   } catch (e) { if (!silent && $("status")) $("status").textContent = e.message; }
   finally { S.syncing = false; }
 }
