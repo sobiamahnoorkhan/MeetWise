@@ -1,8 +1,21 @@
-export interface PlaceCandidate {id:string;name:string;latitude:number;longitude:number;type:string;address?:string;source:string;}
+export interface PlaceCandidate {
+ id:string;
+ name:string;
+ latitude:number;
+ longitude:number;
+ type:string;
+ address?:string;
+ source:string;
+ openingHours?:string;
+ website?:string;
+ phone?:string;
+ cuisine?:string;
+ operationalStatus:"listing_found"|"opening_hours_available"|"opening_status_unknown";
+}
 
 interface Center { latitude:number; longitude:number; }
 
-function bbox(center:Center, radiusKm:number){
+function bbox(center:Center,radiusKm:number){
  const latDelta=radiusKm/111;
  const lonDelta=radiusKm/(111*Math.max(Math.cos(center.latitude*Math.PI/180),0.2));
  return {
@@ -20,8 +33,10 @@ export async function findPlaces(area:string,preferences:string[],center?:Center
   "cafe",
   "park",
   "food",
-  "shopping mall"
- ])].slice(0,8);
+  "shopping mall",
+  "sports centre",
+  "cinema"
+ ])].slice(0,10);
 
  const results:PlaceCandidate[]=[];
  const seen=new Set<string>();
@@ -30,8 +45,10 @@ export async function findPlaces(area:string,preferences:string[],center?:Center
   const u=new URL("https://nominatim.openstreetmap.org/search");
   u.searchParams.set("q",center ? query : [query,area].filter(Boolean).join(" "));
   u.searchParams.set("format","jsonv2");
-  u.searchParams.set("limit","5");
+  u.searchParams.set("limit","8");
   u.searchParams.set("addressdetails","1");
+  u.searchParams.set("extratags","1");
+  u.searchParams.set("namedetails","1");
 
   if(center){
    const radiusKm=Math.min(25,Math.max(3,Number(area)||3));
@@ -40,24 +57,36 @@ export async function findPlaces(area:string,preferences:string[],center?:Center
    u.searchParams.set("bounded","1");
   }
 
-  const r=await fetch(u,{headers:{"User-Agent":"MeetWise-AI/1.0 (group meetup planner)"}});
-  if(!r.ok) continue;
-  const data=await r.json() as any[];
+  try{
+   const r=await fetch(u,{headers:{"User-Agent":"MeetWise-AI/1.0 (group meetup planner)"}});
+   if(!r.ok) continue;
+   const data=await r.json() as any[];
 
-  for(const x of data){
-   const id=String(x.place_id);
-   const latitude=Number(x.lat),longitude=Number(x.lon);
-   if(seen.has(id)||!Number.isFinite(latitude)||!Number.isFinite(longitude)) continue;
-   seen.add(id);
-   results.push({
-    id,
-    name:String(x.display_name||"").split(",")[0]||query,
-    latitude,
-    longitude,
-    type:String(x.type||"place"),
-    address:String(x.display_name||""),
-    source:"OpenStreetMap/Nominatim"
-   });
+   for(const x of data){
+    const id=String(x.osm_type||"place")+":"+String(x.osm_id??x.place_id);
+    const latitude=Number(x.lat),longitude=Number(x.lon);
+    if(seen.has(id)||!Number.isFinite(latitude)||!Number.isFinite(longitude)) continue;
+    seen.add(id);
+
+    const tags=x.extratags??{};
+    const openingHours=typeof tags.opening_hours==="string" ? tags.opening_hours : undefined;
+    results.push({
+     id,
+     name:String(x.name||x.display_name||"").trim().split(",")[0]||query,
+     latitude,
+     longitude,
+     type:String(x.type||x.category||"place"),
+     address:String(x.display_name||""),
+     source:"OpenStreetMap/Nominatim",
+     openingHours,
+     website:typeof tags.website==="string"?tags.website:undefined,
+     phone:typeof tags.phone==="string"?tags.phone:undefined,
+     cuisine:typeof tags.cuisine==="string"?tags.cuisine:undefined,
+     operationalStatus:openingHours?"opening_hours_available":"listing_found"
+    });
+   }
+  }catch{
+   // A failed query should not discard results from other queries.
   }
  }
 
