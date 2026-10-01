@@ -11,9 +11,10 @@ export const meetupRouter=Router();
 meetupRouter.post("/",async(req,res)=>{
  const title=typeof req.body?.title==="string"?req.body.title.trim():"";
  const organizerName=typeof req.body?.organizerName==="string"?req.body.organizerName.trim():"";
+ const scheduledAt=typeof req.body?.scheduledAt==="string"&&req.body.scheduledAt?new Date(req.body.scheduledAt).toISOString():undefined;
  if(!title||!organizerName)return res.status(400).json({error:"title and organizerName are required"});
  const now=new Date(),organizerId=randomUUID();
- const meetup:Meetup={id:randomUUID(),inviteCode:generateInviteCode(),title,organizerId,createdAt:now.toISOString(),expiresAt:new Date(now.getTime()+getTtlMinutes()*60000).toISOString(),members:[{id:organizerId,name:organizerName,joinedAt:now.toISOString(),preferences:{}}],chat:[],votes:[]};
+ const meetup:Meetup={id:randomUUID(),inviteCode:generateInviteCode(),title,organizerId,createdAt:now.toISOString(),scheduledAt,expiresAt:new Date(now.getTime()+getTtlMinutes()*60000).toISOString(),members:[{id:organizerId,name:organizerName,joinedAt:now.toISOString(),preferences:{}}],chat:[],votes:[]};
  try{return res.status(201).json(await createMeetup(meetup));}catch(e){console.error(e);return res.status(500).json({error:"Unable to create meetup"});}
 });
 
