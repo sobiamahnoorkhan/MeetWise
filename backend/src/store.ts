@@ -8,7 +8,7 @@ const ttlMinutes = Number(process.env.MEETUP_TTL_MINUTES ?? 360);
 const memberRow = (meetupId: string, m: Member) => ({
   id: m.id,
   meetup_id: meetupId,
-  user_id: null,
+  user_id: m.userId ?? null,
   name: m.name,
   area: m.preferences.area ?? null,
   latitude: m.preferences.latitude ?? null,
@@ -41,6 +41,7 @@ const toMember = (r: any): Member => {
   }
   return {
     id: r.id,
+    userId: r.user_id ?? undefined,
     name: r.name,
     joinedAt: r.joined_at,
     preferences: {
