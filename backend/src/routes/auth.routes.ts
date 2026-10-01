@@ -6,7 +6,7 @@ authRouter.post("/signup",async(req,res)=>{
  const n=req.body?.name,e=req.body?.email,p=req.body?.password;
  if(typeof n!=="string"||typeof e!=="string"||typeof p!=="string"||!n.trim()||!e.trim()||!p)return res.status(400).json({error:"name, email and password are required"});
  try{return res.status(201).json(await signup(n,e,p))}
- catch(x){return res.status(400).json({error:x instanceof Error?x.message:"Unable to sign up"})}
+ catch(x){\n  const message=x&&typeof x==="object"&&"message" in x?String((x as {message?:unknown}).message):x instanceof Error?x.message:"Unable to sign up";\n  console.error("Signup error:",x);\n  return res.status(400).json({error:message});\n }
 });
 
 authRouter.post("/login",async(req,res)=>{
