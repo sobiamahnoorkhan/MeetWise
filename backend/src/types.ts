@@ -40,6 +40,7 @@ export interface Meetup {
   organizerId: string;
   createdAt: string;
   expiresAt: string;
+  scheduledAt?: string;
   members: Member[];
   chat: ChatMessage[];
   votes: Vote[];
