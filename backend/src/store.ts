@@ -1,5 +1,5 @@
 import { randomInt } from "node:crypto";
-import { Meetup, Member } from "./types.js";
+import { Meetup, Member, MemberPreferences, ChatMessage, Vote } from "./types.js";
 import { supabase } from "./db.js";
 
 const ttlMinutes = Number(process.env.MEETUP_TTL_MINUTES ?? 360);
@@ -17,15 +17,27 @@ const memberRow = (meetupId: string, m: Member) => ({
   budget_max: m.preferences.budget ?? null,
   food_preferences: m.preferences.foodPreferences ?? [],
   activity_preferences: m.preferences.activityPreferences ?? [],
-  availability: m.preferences.availableFrom && m.preferences.availableTo
-    ? `${m.preferences.availableFrom}-${m.preferences.availableTo}`
+  availability: (m.preferences.availableFrom || m.preferences.availableTo)
+    ? JSON.stringify({ from: m.preferences.availableFrom ?? null, to: m.preferences.availableTo ?? null })
     : null,
   max_travel_minutes: m.preferences.maxTravelMinutes ?? null,
   joined_at: m.joinedAt
 });
 
 const toMember = (r: any): Member => {
-  const [availableFrom, availableTo] = String(r.availability ?? "").split("-");
+  let availableFrom: string | undefined;
+  let availableTo: string | undefined;
+  const rawAvailability = String(r.availability ?? "");
+  if (rawAvailability) {
+    try {
+      const parsed = JSON.parse(rawAvailability);
+      availableFrom = parsed.from || undefined;
+      availableTo = parsed.to || undefined;
+    } catch {
+      // Backward compatibility for older records.
+      availableFrom = rawAvailability || undefined;
+    }
+  }
   return {
     id: r.id,
     name: r.name,
