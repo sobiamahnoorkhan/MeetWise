@@ -103,6 +103,15 @@ async function refresh(silent = false) {
   S.syncing = true;
   try {
     S.meetup = await api("/meetups/" + S.meetup.id);
+    // Recover a stale local member id after refresh/account switching.
+    // The active member must always be one of this meetup's persisted members.
+    if (!S.meetup.members.some(m => m.id === S.memberId)) {
+      const sameName = S.meetup.members.filter(m => m.name === S.user?.name);
+      if (sameName.length === 1) {
+        S.memberId = sameName[0].id;
+        localStorage.setItem("meetwise_member", S.memberId);
+      }
+    }
     // Rebuild voting options from the persisted plan so every group member
     // sees the same options after refresh/login, not only the member who ran research.
     if (!S.candidates.length && S.meetup.finalPlan?.status === "ready") {
@@ -256,6 +265,12 @@ function renderVotingPanel() {
 
 async function vote(id) {
   try {
+    if (!S.meetup?.members?.some(m => m.id === S.memberId)) {
+      await refresh();
+    }
+    if (!S.meetup?.members?.some(m => m.id === S.memberId)) {
+      throw new Error("Your membership for this meetup is not active. Please leave and join this meetup again.");
+    }
     await api("/meetups/" + S.meetup.id + "/votes", {method:"POST", body:JSON.stringify({memberId:S.memberId,optionId:id})});
     await refresh();
     alert("Vote recorded");
