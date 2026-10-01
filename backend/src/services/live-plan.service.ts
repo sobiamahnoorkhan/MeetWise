@@ -33,7 +33,8 @@ function preferenceMatch(meetup:Meetup,c:any){
  ]))].filter(Boolean);
  const haystack=(c.name+" "+(c.address??"")+" "+c.type+" "+(c.cuisine??"")).toLowerCase();
  const matched=prefs.filter(p=>haystack.includes(p.toLowerCase()));
- return {prefs,matched};
+ const memberMatches=meetup.members.map(m=>{const mp=[...(m.preferences.activityPreferences??[]),...(m.preferences.foodPreferences??[])].filter(Boolean);return {memberId:m.id,memberName:m.name,matched:[...new Set(mp.filter(p=>haystack.includes(p.toLowerCase())))]};});
+ return {prefs,matched,memberMatches,membersWithPreferenceMatch:memberMatches.filter(x=>x.matched.length>0).length};
 }
 
 export async function createLivePlan(meetup:Meetup,when?:string){
@@ -60,7 +61,7 @@ export async function createLivePlan(meetup:Meetup,when?:string){
    const averageTravel=confirmedTimes.length?totalTravel!/confirmedTimes.length:null;
 
    const weather=when?await getLiveWeather(c.latitude,c.longitude,when):null;
-   const {prefs,matched}=preferenceMatch(meetup,c);
+   const {prefs,matched,memberMatches,membersWithPreferenceMatch}=preferenceMatch(meetup,c);
 
    let total=0,satisfied=0;
    const explanation:string[]=[
@@ -103,10 +104,14 @@ export async function createLivePlan(meetup:Meetup,when?:string){
    }
 
    const score=total?Math.round(satisfied/total*100):null;
+   const travelByMember=travel.map((t,i)=>({memberId:t.memberId,memberName:meetup.members[i]?.name??"Member",durationMinutes:t.durationMinutes,distanceMeters:t.distanceMeters,provider:t.provider}));
    return {
     candidate:c,
     travel,
+    travelByMember,
     weather,
+    preferenceMatches:memberMatches,
+    membersWithPreferenceMatch,
     score,
     maxTravelMinutes:maxTravel,
     totalTravelMinutes:totalTravel===null?null:Math.round(totalTravel),
@@ -127,6 +132,7 @@ export async function createLivePlan(meetup:Meetup,when?:string){
  results.sort((a,b)=>
   (a.maxTravelMinutes??99999)-(b.maxTravelMinutes??99999) ||
   (a.totalTravelMinutes??99999)-(b.totalTravelMinutes??99999) ||
+  (b.membersWithPreferenceMatch??0)-(a.membersWithPreferenceMatch??0) ||
   (b.score??-1)-(a.score??-1)
  );
 
