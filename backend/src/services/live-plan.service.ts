@@ -38,11 +38,13 @@ function preferenceMatch(meetup:Meetup,c:any){
 
 export async function createLivePlan(meetup:Meetup,when?:string){
  const membersWithLocations=meetup.members.filter(m=>Number.isFinite(m.preferences.latitude)&&Number.isFinite(m.preferences.longitude));
+ const missingMembers=meetup.members.filter(m=>!Number.isFinite(m.preferences.latitude)||!Number.isFinite(m.preferences.longitude)).map(m=>m.name);
  const preferences=[...new Set(meetup.members.flatMap(m=>[
   ...(m.preferences.activityPreferences??[]),
   ...(m.preferences.foodPreferences??[])
  ]))];
  if(membersWithLocations.length<1)return{status:"needs_input",missingData:["member location/area"]};
+ if(missingMembers.length)return{status:"needs_input",missingData:missingMembers.map(name=>name+" needs a location/area before a fair plan can be calculated")};
 
  const center=groupCenter(meetup);
  if(!center)return{status:"needs_input",missingData:["member location/area"]};
