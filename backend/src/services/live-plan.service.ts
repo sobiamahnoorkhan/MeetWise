@@ -26,11 +26,23 @@ function spreadRadiusKm(meetup:Meetup,center:{latitude:number;longitude:number})
  return Math.min(25,Math.max(3,Math.max(...distances)*0.9+2));
 }
 
+function preferenceMatch(meetup:Meetup,c:any){
+ const prefs=[...new Set(meetup.members.flatMap(m=>[
+  ...(m.preferences.activityPreferences??[]),
+  ...(m.preferences.foodPreferences??[])
+ ]))].filter(Boolean);
+ const haystack=(c.name+" "+(c.address??"")+" "+c.type+" "+(c.cuisine??"")).toLowerCase();
+ const matched=prefs.filter(p=>haystack.includes(p.toLowerCase()));
+ return {prefs,matched};
+}
+
 export async function createLivePlan(meetup:Meetup,when?:string){
  const membersWithLocations=meetup.members.filter(m=>Number.isFinite(m.preferences.latitude)&&Number.isFinite(m.preferences.longitude));
- const areas=meetup.members.map(m=>m.preferences.area).filter(Boolean) as string[];
- const preferences=[...new Set(meetup.members.flatMap(m=>[...(m.preferences.activityPreferences??[]),...(m.preferences.foodPreferences??[])]))];
- if(!membersWithLocations.length)return{status:"needs_input",missingData:["member location/area"]};
+ const preferences=[...new Set(meetup.members.flatMap(m=>[
+  ...(m.preferences.activityPreferences??[]),
+  ...(m.preferences.foodPreferences??[])
+ ]))];
+ if(membersWithLocations.length<1)return{status:"needs_input",missingData:["member location/area"]};
 
  const center=groupCenter(meetup);
  if(!center)return{status:"needs_input",missingData:["member location/area"]};
@@ -38,16 +50,19 @@ export async function createLivePlan(meetup:Meetup,when?:string){
  const candidates=await findPlaces(String(spreadRadiusKm(meetup,center)),preferences,center);
  if(!candidates.length)return{status:"no_results",candidates:[]};
 
- const results=await Promise.all(candidates.slice(0,20).map(async c=>{
+ const results=await Promise.all(candidates.slice(0,24).map(async c=>{
    const travel=await Promise.all(meetup.members.map(m=>route(m.id,m.preferences,{latitude:c.latitude,longitude:c.longitude})));
    const confirmedTimes=travel.map(t=>t.durationMinutes).filter((t):t is number=>typeof t==="number");
    const maxTravel=confirmedTimes.length?Math.max(...confirmedTimes):null;
-   const averageTravel=confirmedTimes.length?confirmedTimes.reduce((a,b)=>a+b,0)/confirmedTimes.length:null;
+   const totalTravel=confirmedTimes.length?confirmedTimes.reduce((a,b)=>a+b,0):null;
+   const averageTravel=confirmedTimes.length?totalTravel!/confirmedTimes.length:null;
 
    const weather=when?await getLiveWeather(c.latitude,c.longitude,when):null;
+   const {prefs,matched}=preferenceMatch(meetup,c);
+
    let total=0,satisfied=0;
    const explanation:string[]=[
-    `Shared meeting area is centered around ${center.latitude.toFixed(3)}, ${center.longitude.toFixed(3)} based on member locations`
+    `Shared meeting area is centered around ${center.latitude.toFixed(3)}, ${center.longitude.toFixed(3)} from supplied member locations`
    ];
 
    meetup.members.forEach((m,i)=>{
@@ -57,18 +72,16 @@ export async function createLivePlan(meetup:Meetup,when?:string){
        if(t!==null&&t!==undefined&&t<=limit){
         satisfied++;
         explanation.push(m.name+": travel time is within their limit");
-       } else {
-        explanation.push(m.name+": travel limit is not confirmed for this place");
+       }else{
+        explanation.push(m.name+": travel limit is exceeded or could not be confirmed");
        }
      }
    });
 
-   if(preferences.length){
-    const haystack=(c.name+" "+(c.address??"")+" "+c.type).toLowerCase();
-    const matched=preferences.filter(p=>haystack.includes(p.toLowerCase()));
+   if(prefs.length){
     explanation.push(matched.length
-      ? "Research match: "+matched.join(", ")
-      : "Place is near the shared center; exact preference match was not verified");
+      ? "Preference match found: "+matched.join(", ")
+      : "No exact preference match was verified; venue was found near the shared meeting area");
    }
 
    if(weather?.available){
@@ -76,9 +89,15 @@ export async function createLivePlan(meetup:Meetup,when?:string){
     if((weather.precipitationProbability??0)<=50){
      satisfied++;
      explanation.push("Weather check: precipitation probability is at or below 50%");
-    } else {
+    }else{
      explanation.push("Weather check: precipitation probability is above 50%");
     }
+   }
+
+   if(c.openingHours){
+    explanation.push("Opening-hours information is available from the venue listing");
+   }else{
+    explanation.push("Opening-hours information was not available in the venue listing");
    }
 
    const score=total?Math.round(satisfied/total*100):null;
@@ -88,21 +107,32 @@ export async function createLivePlan(meetup:Meetup,when?:string){
     weather,
     score,
     maxTravelMinutes:maxTravel,
+    totalTravelMinutes:totalTravel===null?null:Math.round(totalTravel),
     averageTravelMinutes:averageTravel===null?null:Math.round(averageTravel),
     constraintsSatisfied:satisfied,
     constraintsTotal:total,
     budgetStatus:"unknown — venue price was not verified",
+    availabilityStatus:c.operationalStatus==="opening_hours_available"
+      ?"Opening-hours data found; live occupancy/reservation was not verified"
+      :"Venue listing found; opening status was not verified",
     explanation
    };
  }));
 
- // The core MeetWise objective is fairness: first minimize the longest
- // confirmed journey, then the average journey, then other constraints.
+ // Fairness is the hard objective: do not send one member far out of the way.
+ // Among similarly fair options, reduce total travel time, then verified constraints.
  results.sort((a,b)=>
   (a.maxTravelMinutes??99999)-(b.maxTravelMinutes??99999) ||
-  (a.averageTravelMinutes??99999)-(b.averageTravelMinutes??99999) ||
+  (a.totalTravelMinutes??99999)-(b.totalTravelMinutes??99999) ||
   (b.score??-1)-(a.score??-1)
  );
+
+ const bestMax=results[0]?.maxTravelMinutes;
+ results.forEach(x=>{
+  x.fairnessScore=bestMax!=null&&x.maxTravelMinutes!=null
+    ?Math.max(0,Math.round(100*(bestMax/(Math.max(bestMax,x.maxTravelMinutes)))))
+    :null;
+ });
 
  return{
   status:"ready",
@@ -110,12 +140,14 @@ export async function createLivePlan(meetup:Meetup,when?:string){
   goal:meetup.title,
   center,
   candidates:results,
-  objective:"Minimize the longest confirmed travel time so no member is unnecessarily sent far out of the way; then minimize average travel time and consider verified constraints.",
+  objective:"First minimize the longest confirmed journey for fairness, then minimize total confirmed travel time, then consider verified constraints.",
   source:"OpenStreetMap/Nominatim + OSRM + Open-Meteo",
   limitations:[
-   "Venue prices/budget fit are not verified by these sources",
-   "OSRM routing is driving-based; walking, bike and public-transit times are not separately verified",
-   "The shared center is based on the supplied member coordinates; road-network fairness can differ from a straight-line geographic center"
+   "Venue prices/budget fit are not verified by these free sources",
+   "Live reservation, seating, occupancy, or crowd status is not verified",
+   "Opening-hours data is only shown when the venue listing provides it and may not reflect temporary closures",
+   "OSRM routing currently confirms driving routes; walking, bike and public-transit times are not separately verified",
+   "The shared center is a starting search area; final ranking is based on road travel times"
   ]
  };
 }
