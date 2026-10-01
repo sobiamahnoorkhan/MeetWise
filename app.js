@@ -192,6 +192,7 @@ async function replan() {
 }
 
 function renderPlan(d) {
+  S.candidates = [];
   if (d.status === "needs_input") {
     $("results").innerHTML = '<div class="emptyState"><b>More information is needed</b><p>' + esc((d.missingData || []).join(", ")) + "</p></div>";
     return;
@@ -240,7 +241,7 @@ function renderVotingPanel() {
 async function vote(id) {
   try {
     await api("/meetups/" + S.meetup.id + "/votes", {method:"POST", body:JSON.stringify({memberId:S.memberId,optionId:id})});
-    await voteSummary();
+    await refresh();
     alert("Vote recorded");
   } catch (e) { alert(e.message); }
 }
