@@ -112,6 +112,7 @@ export async function createLivePlan(meetup:Meetup,when?:string){
     constraintsSatisfied:satisfied,
     constraintsTotal:total,
     budgetStatus:"unknown — venue price was not verified",
+    fairnessScore:null,
     availabilityStatus:c.operationalStatus==="opening_hours_available"
       ?"Opening-hours data found; live occupancy/reservation was not verified"
       :"Venue listing found; opening status was not verified",
