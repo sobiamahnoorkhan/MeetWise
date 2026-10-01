@@ -51,7 +51,7 @@ async function login() {
 }
 
 function home() {
-  app.innerHTML = '<main class="shell"><div class="nav"><b class="brand">MeetWise AI</b><button id="logout" class="secondary" style="width:auto">Log out</button></div><div class="grid"><section class="card"><h2>Create meetup</h2><input id="title" placeholder="Saturday evening meetup"><button id="create">Create & invite</button></section><section class="card"><h2>Join meetup</h2><input id="code" placeholder="Invite code"><input id="joinName" placeholder="Your name"><button id="join">Join</button></section></div></main>';
+  app.innerHTML = '<main class="shell"><div class="nav"><b class="brand">MeetWise AI</b><button id="logout" class="secondary" style="width:auto">Log out</button></div><div class="grid"><section class="card"><h2>Create meetup</h2><input id="title" placeholder="Saturday evening meetup"><label class="muted">Meetup date & time</label><input id="scheduledAt" type="datetime-local"><button id="create">Create & invite</button></section><section class="card"><h2>Join meetup</h2><input id="code" placeholder="Invite code"><input id="joinName" placeholder="Your name"><button id="join">Join</button></section></div></main>';
   $("logout").onclick = logout;
   $("create").onclick = createMeetup;
   $("join").onclick = joinMeetup;
@@ -78,9 +78,10 @@ async function joinMeetup() {
 }
 
 function dashboard() {
-  app.innerHTML = '<main class="shell"><div class="nav"><div><b class="brand">MeetWise AI</b><div id="meetupTitle" class="muted"></div></div><span id="invite" class="pill"></span></div><div class="grid"><section class="card"><h3>Members</h3><div id="members"></div><h3>Your preferences</h3><input id="area" placeholder="Area / neighborhood"><select id="transport"><option value="">Transport</option><option value="walking">Walking</option><option value="bike">Bike</option><option value="car">Car</option><option value="public_transport">Public transport</option></select><input id="budget" type="number" placeholder="Budget PKR"><input id="maxTravel" type="number" placeholder="Max travel minutes"><input id="food" placeholder="Food preferences"><input id="activity" placeholder="Activity preferences"><input id="when" type="datetime-local"><button id="savePrefs">Save preferences</button><button id="research" class="secondary">Research live options</button><button id="replan" class="secondary">Re-plan</button><p id="status" class="muted"></p></section><section class="card"><h3>Group chat</h3><div id="chat" class="chat"></div><div class="row"><input id="chatText" placeholder="Message or new constraint"><button id="send" style="max-width:120px">Send</button></div><button id="analyze" class="secondary">AI constraint analysis</button><pre id="ai" style="white-space:pre-wrap"></pre></section></div><section class="card" style="margin-top:18px"><h2>Live Group Preferences</h2><div id="livePrefs" class="livePrefs"></div><p id="syncStatus" class="muted">Live sync enabled</p></section><section class="card" style="margin-top:18px"><h2>AI Meetup Plan</h2><div id="results" class="emptyState">Save preferences and run research.</div></section><section class="card" style="margin-top:18px"><h2>Group Voting</h2><div id="votingPanel" class="votingPanel"><div class="emptyState">Run live research to create voting options.</div></div></section></main>';
+  app.innerHTML = '<main class="shell"><div class="nav"><div><b class="brand">MeetWise AI</b><div id="meetupTitle" class="muted"></div></div><span id="invite" class="pill"></span></div><div id="meetupReminder" class="muted"></div><div class="grid"><section class="card"><h3>Members</h3><div id="members"></div><h3>Your preferences</h3><input id="area" placeholder="Area / neighborhood"><select id="transport"><option value="">Transport</option><option value="walking">Walking</option><option value="bike">Bike</option><option value="car">Car</option><option value="public_transport">Public transport</option></select><input id="budget" type="number" placeholder="Budget PKR"><input id="maxTravel" type="number" placeholder="Max travel minutes"><input id="food" placeholder="Food preferences"><input id="activity" placeholder="Activity preferences"><input id="when" type="datetime-local"><button id="savePrefs">Save preferences</button><button id="research" class="secondary">Research live options</button><button id="replan" class="secondary">Re-plan</button><p id="status" class="muted"></p></section><section class="card"><h3>Group chat</h3><div id="chat" class="chat"></div><div class="row"><input id="chatText" placeholder="Message or new constraint"><button id="send" style="max-width:120px">Send</button></div><button id="analyze" class="secondary">AI constraint analysis</button><pre id="ai" style="white-space:pre-wrap"></pre></section></div><section class="card" style="margin-top:18px"><h2>Live Group Preferences</h2><div id="livePrefs" class="livePrefs"></div><p id="syncStatus" class="muted">Live sync enabled</p></section><section class="card" style="margin-top:18px"><h2>AI Meetup Plan</h2><div id="results" class="emptyState">Save preferences and run research.</div></section><section class="card" style="margin-top:18px"><h2>Group Voting</h2><div id="votingPanel" class="votingPanel"><div class="emptyState">Run live research to create voting options.</div></div></section></main>';
   $("meetupTitle").textContent = S.meetup.title;
   $("invite").innerHTML = "Invite: <b>" + esc(S.meetup.inviteCode) + "</b>";
+  setupMeetupReminder();
   $("savePrefs").onclick = savePrefs;
   $("useLocation").onclick = useCurrentLocation;
   $("research").onclick = research;
@@ -93,6 +94,27 @@ function dashboard() {
   });
   refresh();
   startLiveSync();
+}
+
+function setupMeetupReminder() {
+  if (S.reminderTimer) clearTimeout(S.reminderTimer);
+  const at = S.meetup?.scheduledAt ? new Date(S.meetup.scheduledAt).getTime() : 0;
+  if (!at || at <= Date.now()) return;
+  const key = "meetwise_reminded_" + S.meetup.id;
+  const remindAt = at - 30 * 60 * 1000;
+  const delay = Math.max(0, remindAt - Date.now());
+  S.reminderTimer = setTimeout(() => {
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, "1");
+    const message = "MeetWise reminder: " + S.meetup.title + " starts at " + new Date(at).toLocaleString();
+    if ("Notification" in window) {
+      if (Notification.permission === "granted") new Notification("MeetWise reminder", {body:message});
+      else if (Notification.permission !== "denied") Notification.requestPermission().then(p => { if (p === "granted") new Notification("MeetWise reminder", {body:message}); });
+    }
+    alert(message);
+  }, delay);
+  const reminder = $("meetupReminder");
+  if (reminder) reminder.textContent = "Reminder: 30 minutes before · " + new Date(at).toLocaleString();
 }
 
 function startLiveSync() {
