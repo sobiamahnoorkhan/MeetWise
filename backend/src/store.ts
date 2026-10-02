@@ -67,57 +67,18 @@ export async function saveMeetup(meetup: Meetup): Promise<Meetup> {
     created_by: null,
     status: "active",
     scheduled_at: meetup.scheduledAt ?? null,
-    expires_at: meetup.expiresAt,
-    // Do not overwrite an existing live plan during member/chat/vote updates.
+    expires_at: meetup.expiresAt
   });
   if (meetupError) throw meetupError;
 
-  const { error: deleteMembersError } = await supabase
-    .from("meetup_members")
-    .delete()
-    .eq("meetup_id", meetup.id);
-  if (deleteMembersError) throw deleteMembersError;
-
-  const { error: membersError } = await supabase
-    .from("meetup_members")
-    .insert(meetup.members.map(m => memberRow(meetup.id, m)));
-  if (membersError) throw membersError;
-
-  const { error: deleteMessagesError } = await supabase
-    .from("messages")
-    .delete()
-    .eq("meetup_id", meetup.id);
-  if (deleteMessagesError) throw deleteMessagesError;
-
-  if (meetup.chat.length) {
-    const { error } = await supabase.from("messages").insert(
-      meetup.chat.map(m => ({
-        id: m.id,
-        meetup_id: meetup.id,
-        member_id: m.memberId,
-        message: m.text,
-        created_at: m.createdAt
-      }))
-    );
-    if (error) throw error;
-  }
-
-  const { error: deleteVotesError } = await supabase
-    .from("votes")
-    .delete()
-    .eq("meetup_id", meetup.id);
-  if (deleteVotesError) throw deleteVotesError;
-
-  if (meetup.votes.length) {
-    const { error } = await supabase.from("votes").insert(
-      meetup.votes.map(v => ({
-        meetup_id: meetup.id,
-        member_id: v.memberId,
-        candidate_id: v.optionId,
-        created_at: v.createdAt
-      }))
-    );
-    if (error) throw error;
+  // Create/join operations only add members. Do not delete and recreate the
+  // whole member/message/vote sets: doing that can break foreign-key references
+  // and can wipe persisted group activity.
+  if (meetup.members.length) {
+    const { error: membersError } = await supabase
+      .from("meetup_members")
+      .upsert(meetup.members.map(m => memberRow(meetup.id, m)), { onConflict: "id" });
+    if (membersError) throw membersError;
   }
 
   return meetup;
