@@ -19,7 +19,11 @@ meetupRouter.post("/",async(req,res)=>{
  const expiryBase=scheduledAt?new Date(scheduledAt).getTime():now.getTime();
  const expiresAt=new Date(Math.max(now.getTime()+getTtlMinutes()*60000,expiryBase+24*60*60*1000)).toISOString();
  const meetup:Meetup={id:randomUUID(),inviteCode:generateInviteCode(),title,organizerId,createdAt:now.toISOString(),scheduledAt,expiresAt,members:[{id:organizerId,userId:authUser?.id,name:organizerName,joinedAt:now.toISOString(),preferences:{}}],chat:[],votes:[]};
- try{return res.status(201).json(await createMeetup(meetup));}catch(e){console.error(e);return res.status(500).json({error:"Unable to create meetup"});}
+ try{return res.status(201).json(await createMeetup(meetup));}catch(e){
+  console.error("Create meetup error:",e);
+  const message=e instanceof Error?e.message:"Unable to create meetup";
+  return res.status(500).json({error:message});
+}
 });
 
 meetupRouter.get("/code/:code",async(req,res)=>{
