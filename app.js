@@ -1,5 +1,7 @@
 const app = document.getElementById("app");
-const API = (localStorage.getItem("meetwise_api") || "https://meetwise-backend.vercel.app/api").replace(/\/$/, "");
+const savedAPI = localStorage.getItem("meetwise_api");
+const isLocalHost = ["localhost","127.0.0.1"].includes(window.location.hostname);
+const API = ((isLocalHost && savedAPI) ? savedAPI : "https://meetwise-backend.vercel.app/api").replace(/\/$/, "");
 const S = {
   token: localStorage.getItem("meetwise_token"),
   user: JSON.parse(localStorage.getItem("meetwise_user") || "null"),
