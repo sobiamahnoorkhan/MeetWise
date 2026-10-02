@@ -430,67 +430,6 @@ async function sendChat() {
   } catch (e) { alert(e.message); }
 }
 
-async function analyzeChat(latestMessage) {
-  try {
-    const d = await api("/live/meetups/" + S.meetup.id + "/analyze", {
-      method:"POST",
-      body:JSON.stringify({message:latestMessage || undefined})
-    });
-    let result = d.result;
-    if (typeof result === "string") {
-      try { result = JSON.parse(result); } catch {}
-    }
-    if (result && typeof result === "object") {
-      const reply = result.reply ? "AI: " + result.reply + "\n\n" : "";
-      const constraints = Array.isArray(result.constraints) && result.constraints.length
-        ? "Constraints:\n• " + result.constraints.join("\n• ")
-        : "";
-      const conflicts = Array.isArray(result.conflicts) && result.conflicts.length
-        ? "\n\nConflicts:\n• " + result.conflicts.join("\n• ")
-        : "";
-      $("ai").innerHTML = '<div class="aiHeader">' + (d.fallback ? "MeetWise Smart Analysis" : "MeetWise AI") + '</div>' + esc(reply + constraints + conflicts) + (d.fallback ? '<div class="muted" style="margin-top:8px;font-size:12px">Gemini is unavailable, so MeetWise used local constraint analysis instead of stopping.</div>' : "");
-
-      // Apply only explicit, schema-shaped preference updates returned by the AI.
-      const allowed = new Set(["area","transportMode","budget","foodPreferences","activityPreferences","availableFrom","availableTo","maxTravelMinutes"]);
-      const updates = Array.isArray(result.preferenceUpdates) ? result.preferenceUpdates : [];
-      let applied = 0;
-      for (const item of updates) {
-        if (!item || typeof item.memberName !== "string" || !item.fields || typeof item.fields !== "object") continue;
-        const member = S.meetup.members.find(m => m.name.toLowerCase() === item.memberName.trim().toLowerCase());
-        if (!member) continue;
-        const patch = {};
-        for (const [key,value] of Object.entries(item.fields)) {
-          if (!allowed.has(key)) continue;
-          if (["area","transportMode","availableFrom","availableTo"].includes(key) && typeof value === "string" && value.trim()) patch[key]=value.trim();
-          else if (["budget","maxTravelMinutes"].includes(key) && Number.isFinite(Number(value))) patch[key]=Number(value);
-          else if (["foodPreferences","activityPreferences"].includes(key) && Array.isArray(value)) patch[key]=value.map(String).map(x=>x.trim()).filter(Boolean);
-        }
-        if (Object.keys(patch).length) {
-          await api("/meetups/" + S.meetup.id + "/members/" + member.id + "/preferences", {
-            method:"PATCH", body:JSON.stringify(patch)
-          });
-          applied++;
-        }
-      }
-      if (applied) {
-        await refresh(true);
-        const planTime = $("when")?.value ? localDateTimeToISO($("when").value) : undefined;
-        const replanned = await api("/meetups/" + S.meetup.id + "/replan", {
-          method:"POST",
-          body:JSON.stringify({reason:"AI extracted an explicit constraint from group chat",memberId:S.memberId,when:planTime})
-        });
-        S.meetup.finalPlan = replanned.plan;
-        renderPlan(replanned.plan);
-        $("status").textContent = "AI understood the new constraint and re-planned the meetup."; $("status").className="statusAI";
-      }
-    } else {
-      $("ai").innerHTML = '<div class="aiHeader">MeetWise analysis</div>' + esc(String(result ?? ""));
-    }
-  } catch (e) {
-    $("ai").innerHTML = '<div class="aiHeader">Analysis status</div>' + esc(e.message);
-  }
-}
-
 async function logout() {
   if (S.liveTimer) clearInterval(S.liveTimer);
   try { await api("/auth/logout", {method:"POST"}); } catch {}
