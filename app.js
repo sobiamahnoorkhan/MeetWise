@@ -371,8 +371,25 @@ function renderVotingPanel() {
   }
   const votes = S.meetup?.votes || [];
   const totalMembers = S.meetup?.members?.length || 0;
-  el.innerHTML = S.candidates.map(c => {
-    const count = votes.filter(v => v.optionId === c.id).length;
+  const counts = S.candidates.map(c => ({
+    candidate:c,
+    count:votes.filter(v => v.optionId === c.id).length
+  })).sort((a,b) => b.count - a.count);
+  const maxVotes = counts[0]?.count || 0;
+  const voters = new Set(votes.map(v => v.memberId));
+  const allMembersVoted = totalMembers > 0 && voters.size >= totalMembers;
+  const leaders = counts.filter(x => x.count === maxVotes && maxVotes > 0);
+  let finalHtml = "";
+  if (allMembersVoted && leaders.length === 1) {
+    const winner = leaders[0].candidate;
+    finalHtml = `<div class="candidate" style="margin-bottom:16px"><div class="score">Final Group Choice</div><h2>🏆 ${esc(winner.name)}</h2><p class="muted">${esc(winner.address)}</p><p><b>${maxVotes} vote${maxVotes === 1 ? "" : "s"} · 100% of members</b></p><p class="muted">Everyone has voted and this place has the highest vote count.</p></div>`;
+  } else if (allMembersVoted && leaders.length > 1) {
+    finalHtml = `<div class="candidate" style="margin-bottom:16px"><div class="score">Voting Tie</div><h3>Two or more places have the same highest votes.</h3><p class="muted">No place is marked as the final choice until the group breaks the tie.</p></div>`;
+  } else {
+    const remaining = Math.max(0, totalMembers - voters.size);
+    finalHtml = `<div class="candidate" style="margin-bottom:16px"><div class="score">Voting in progress</div><p>${remaining ? remaining + " member" + (remaining === 1 ? "" : "s") + " still need to vote." : "Waiting for votes."}</p></div>`;
+  }
+  el.innerHTML = finalHtml + counts.map(({candidate:c,count}) => {
     const mine = votes.some(v => v.memberId === S.memberId && v.optionId === c.id);
     return `<div class="candidate"><div class="score">${count} vote${count === 1 ? "" : "s"} · ${totalMembers ? Math.round(count / totalMembers * 100) : 0}% of members</div><h3>${esc(c.name)}</h3><p class="muted">${esc(c.address)}</p><button data-panel-vote="${esc(c.id)}">${mine ? "✓ Your vote" : "Vote for this option"}</button></div>`;
   }).join("");
