@@ -64,7 +64,7 @@ export async function saveMeetup(meetup: Meetup): Promise<Meetup> {
     id: meetup.id,
     title: meetup.title,
     invite_code: meetup.inviteCode,
-    created_by: null,
+    created_by: meetup.members[0]?.userId ?? null,
     status: "active",
     scheduled_at: meetup.scheduledAt ?? null,
     expires_at: meetup.expiresAt,
