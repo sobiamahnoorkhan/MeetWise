@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { MemberPreferences, Meetup, ChatMessage, Vote } from "../types.js";
 import { getMeetup } from "../store.js";
 
-export function requireMeetup(id: string): Meetup {
-  const meetup = getMeetup(id);
+export async function requireMeetup(id: string): Promise<Meetup> {
+  const meetup = await getMeetup(id);
   if (!meetup) throw new Error("Meetup not found or expired");
   return meetup;
 }
