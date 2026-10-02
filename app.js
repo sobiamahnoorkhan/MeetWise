@@ -88,7 +88,7 @@ async function joinMeetup() {
 }
 
 function dashboard() {
-  app.innerHTML = '<main class="shell"><div class="nav"><div><b class="brand">MeetWise AI</b><div id="meetupTitle" class="muted"></div></div><span id="invite" class="pill"></span></div><div id="meetupReminder" class="muted"></div><div class="grid"><section class="card"><h3>Members</h3><div id="members"></div><h3>Your preferences</h3><div class="row"><input id="area" placeholder="Area / neighborhood"><button id="useLocation" type="button" class="secondary" style="max-width:150px">Use my location</button></div><p id="locationStatus" class="muted"></p><select id="transport"><option value="">Transport</option><option value="walking">Walking</option><option value="bike">Bike</option><option value="car">Car</option><option value="public_transport">Public transport</option></select><input id="budget" type="number" placeholder="Budget PKR"><input id="maxTravel" type="number" placeholder="Max travel minutes"><input id="food" placeholder="Food preferences"><input id="activity" placeholder="Activity preferences"><input id="when" type="datetime-local"><button id="savePrefs">Save preferences</button><button id="research" class="secondary">Research live options</button><button id="replan" class="secondary">Re-plan</button><p id="status" class="muted"></p></section><section class="card"><h3>Group chat</h3><div id="chat" class="chat"></div><div class="row"><input id="chatText" placeholder="Message or new constraint"><button id="send" style="max-width:120px">Send</button></div><button id="analyze" class="secondary">AI constraint analysis</button><pre id="ai" style="white-space:pre-wrap"></pre></section></div><section class="card" style="margin-top:18px"><h2>Live Group Preferences</h2><div id="livePrefs" class="livePrefs"></div><p id="syncStatus" class="muted">Live sync enabled</p></section><section class="card" style="margin-top:18px"><h2>AI Meetup Plan</h2><div id="results" class="emptyState">Save preferences and run research.</div></section><section class="card" style="margin-top:18px"><h2>Meetup Map</h2><div id="meetupMap" class="map"></div><p id="mapStatus" class="muted">Save a member location to place it on the map.</p></section><section class="card" style="margin-top:18px"><h2>Group Voting</h2><div id="votingPanel" class="votingPanel"><div class="emptyState">Run live research to create voting options.</div></div></section></main>';
+  app.innerHTML = '<main class="shell"><div class="nav"><div><b class="brand">MeetWise AI</b><div id="meetupTitle" class="muted"></div></div><span id="invite" class="pill"></span></div><div id="meetupReminder" class="muted"></div><div class="grid"><section class="card"><h3>Members</h3><div id="members"></div><h3>Your preferences</h3><div class="row"><input id="area" placeholder="Area / neighborhood"><button id="useLocation" type="button" class="secondary" style="max-width:150px">Use my location</button></div><p id="locationStatus" class="muted"></p><select id="transport"><option value="">Transport</option><option value="walking">Walking</option><option value="bike">Bike</option><option value="car">Car</option><option value="public_transport">Public transport</option></select><input id="budget" type="number" placeholder="Budget PKR"><input id="maxTravel" type="number" placeholder="Max travel minutes"><input id="food" placeholder="Food preferences"><input id="activity" placeholder="Activity preferences"><input id="when" type="datetime-local"><button id="savePrefs">Save preferences</button><button id="research" class="secondary">Research live options</button><button id="replan" class="secondary">Re-plan</button><p id="status" class="muted"></p></section><section class="card"><h3>Group chat</h3><div id="chat" class="chat"></div><div class="chatComposer"><input id="chatText" placeholder="Type a message or new constraint…"><button id="send" aria-label="Send message">➤</button></div><button id="analyze" class="secondary">✨ Analyze group constraints</button><div id="ai" class="aiPanel"></div></section></div><section class="card" style="margin-top:18px"><h2>Live Group Preferences</h2><div id="livePrefs" class="livePrefs"></div><p id="syncStatus" class="muted">Live sync enabled</p></section><section class="card" style="margin-top:18px"><h2>AI Meetup Plan</h2><div id="results" class="emptyState">Save preferences and run research.</div></section><section class="card" style="margin-top:18px"><h2>Meetup Map</h2><div id="meetupMap" class="map"></div><p id="mapStatus" class="muted">Save a member location to place it on the map.</p></section><section class="card" style="margin-top:18px"><h2>Group Voting</h2><div id="votingPanel" class="votingPanel"><div class="emptyState">Run live research to create voting options.</div></div></section></main>';
   $("meetupTitle").textContent = S.meetup.title;
   $("invite").innerHTML = "Invite: <b>" + esc(S.meetup.inviteCode) + "</b>";
   setupMeetupReminder();
@@ -446,7 +446,7 @@ async function analyzeChat(latestMessage) {
       const conflicts = Array.isArray(result.conflicts) && result.conflicts.length
         ? "\n\nConflicts:\n• " + result.conflicts.join("\n• ")
         : "";
-      $("ai").textContent = reply + constraints + conflicts;
+      $("ai").innerHTML = '<div class="aiHeader">MeetWise AI</div>' + esc(reply + constraints + conflicts);
 
       // Apply only explicit, schema-shaped preference updates returned by the AI.
       const allowed = new Set(["area","transportMode","budget","foodPreferences","activityPreferences","availableFrom","availableTo","maxTravelMinutes"]);
@@ -479,13 +479,13 @@ async function analyzeChat(latestMessage) {
         });
         S.meetup.finalPlan = replanned.plan;
         renderPlan(replanned.plan);
-        $("status").textContent = "AI understood the new constraint and re-planned the meetup.";
+        $("status").textContent = "AI understood the new constraint and re-planned the meetup."; $("status").className="statusAI";
       }
     } else {
-      $("ai").textContent = String(result ?? "");
+      $("ai").innerHTML = '<div class="aiHeader">MeetWise analysis</div>' + esc(String(result ?? ""));
     }
   } catch (e) {
-    $("ai").textContent = e.message;
+    $("ai").innerHTML = '<div class="aiHeader">Analysis status</div>' + esc(e.message);
   }
 }
 
