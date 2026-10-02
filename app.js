@@ -446,7 +446,7 @@ async function analyzeChat(latestMessage) {
       const conflicts = Array.isArray(result.conflicts) && result.conflicts.length
         ? "\n\nConflicts:\n• " + result.conflicts.join("\n• ")
         : "";
-      $("ai").innerHTML = '<div class="aiHeader">MeetWise AI</div>' + esc(reply + constraints + conflicts);
+      $("ai").innerHTML = '<div class="aiHeader">' + (d.fallback ? "MeetWise Smart Analysis" : "MeetWise AI") + '</div>' + esc(reply + constraints + conflicts) + (d.fallback ? '<div class="muted" style="margin-top:8px;font-size:12px">Gemini is unavailable, so MeetWise used local constraint analysis instead of stopping.</div>' : "");
 
       // Apply only explicit, schema-shaped preference updates returned by the AI.
       const allowed = new Set(["area","transportMode","budget","foodPreferences","activityPreferences","availableFrom","availableTo","maxTravelMinutes"]);
