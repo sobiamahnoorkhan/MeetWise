@@ -88,16 +88,18 @@ async function joinMeetup() {
 }
 
 function dashboard() {
-  app.innerHTML = '<main class="shell"><div class="nav"><div><b class="brand">MeetWise AI</b><div id="meetupTitle" class="muted"></div></div><span id="invite" class="pill"></span></div><div id="meetupReminder" class="muted"></div><div class="grid"><section class="card"><h3>Members</h3><div id="members"></div><h3>Your preferences</h3><div class="row"><input id="area" placeholder="Area / neighborhood"><button id="useLocation" type="button" class="secondary" style="max-width:150px">Use my location</button></div><p id="locationStatus" class="muted"></p><select id="transport"><option value="">Transport</option><option value="walking">Walking</option><option value="bike">Bike</option><option value="car">Car</option><option value="public_transport">Public transport</option></select><input id="budget" type="number" placeholder="Budget PKR"><input id="maxTravel" type="number" placeholder="Max travel minutes"><input id="food" placeholder="Food preferences"><input id="activity" placeholder="Activity preferences"><input id="when" type="datetime-local"><button id="savePrefs">Save preferences</button><button id="research" class="secondary">Research live options</button><button id="replan" class="secondary">Re-plan</button><p id="status" class="muted"></p></section><section class="card"><h3>Group chat</h3><div id="chat" class="chat"></div><div class="chatComposer"><input id="chatText" placeholder="Type a message or new constraint…"><button id="send" aria-label="Send message">➤</button></div><button id="analyze" class="secondary">✨ Analyze group constraints</button><div id="ai" class="aiPanel"></div></section></div><section class="card" style="margin-top:18px"><h2>Live Group Preferences</h2><div id="livePrefs" class="livePrefs"></div><p id="syncStatus" class="muted">Live sync enabled</p></section><section class="card" style="margin-top:18px"><h2>AI Meetup Plan</h2><div id="results" class="emptyState">Save preferences and run research.</div></section><section class="card" style="margin-top:18px"><h2>Meetup Map</h2><div id="meetupMap" class="map"></div><p id="mapStatus" class="muted">Save a member location to place it on the map.</p></section><section class="card" style="margin-top:18px"><h2>Group Voting</h2><div id="votingPanel" class="votingPanel"><div class="emptyState">Run live research to create voting options.</div></div></section></main>';
+  app.innerHTML = '<main class="shell"><div class="nav"><div><b class="brand">MeetWise</b><div id="meetupTitle" class="muted"></div></div><div id="inviteCard" class="inviteCard"><div class="inviteLabel">INVITE CODE</div><div class="inviteCodeRow"><strong id="inviteCode"></strong><button id="copyInvite" class="iconBtn" title="Copy invite code">⧉</button><button id="shareInvite" class="iconBtn" title="Share invite">↗</button></div><div id="inviteStatus" class="inviteStatus">Share this code with your group</div></div></div><div id="meetupReminder" class="muted"></div><div class="grid"><section class="card"><h3>Members</h3><div id="members"></div><h3>Your preferences</h3><div class="row"><input id="area" placeholder="Area / neighborhood"><button id="useLocation" type="button" class="secondary" style="max-width:150px">Use my location</button></div><p id="locationStatus" class="muted"></p><select id="transport"><option value="">Transport</option><option value="walking">Walking</option><option value="bike">Bike</option><option value="car">Car</option><option value="public_transport">Public transport</option></select><input id="budget" type="number" placeholder="Budget PKR"><input id="maxTravel" type="number" placeholder="Max travel minutes"><input id="food" placeholder="Food preferences"><input id="activity" placeholder="Activity preferences"><input id="when" type="datetime-local"><button id="savePrefs">Save preferences</button><button id="research" class="secondary">Research live options</button><button id="replan" class="secondary">Re-plan</button><p id="status" class="muted"></p></section><section class="card"><h3>Group chat</h3><div id="chat" class="chat"></div><div class="chatComposer"><input id="chatText" placeholder="Type a message or new constraint…"><button id="send" aria-label="Send message">➤</button></div></section></div><section class="card" style="margin-top:18px"><h2>Live Group Preferences</h2><div id="livePrefs" class="livePrefs"></div><p id="syncStatus" class="muted">Live sync enabled</p></section><section class="card" style="margin-top:18px"><h2>AI Meetup Plan</h2><div id="results" class="emptyState">Save preferences and run research.</div></section><section class="card" style="margin-top:18px"><h2>Meetup Map</h2><div id="meetupMap" class="map"></div><p id="mapStatus" class="muted">Save a member location to place it on the map.</p></section><section class="card" style="margin-top:18px"><h2>Group Voting</h2><div id="votingPanel" class="votingPanel"><div class="emptyState">Run live research to create voting options.</div></div></section></main>';
   $("meetupTitle").textContent = S.meetup.title;
-  $("invite").innerHTML = "Invite: <b>" + esc(S.meetup.inviteCode) + "</b>";
+
+  $("inviteCode").textContent = S.meetup.inviteCode || "------";
+  $("copyInvite").onclick = copyInviteCode;
+  $("shareInvite").onclick = shareInviteCode;
   setupMeetupReminder();
   $("savePrefs").onclick = savePrefs;
   $("useLocation").onclick = useCurrentLocation;
   $("research").onclick = research;
   $("replan").onclick = replan;
   $("send").onclick = sendChat;
-  $("analyze").onclick = analyzeChat;
   ["area","transport","budget","maxTravel","food","activity","when"].forEach(id => {
     $(id).addEventListener("input", () => { S.prefsDirty = true; });
     $(id).addEventListener("change", () => { S.prefsDirty = true; });
@@ -424,69 +426,8 @@ async function sendChat() {
     await api("/meetups/" + S.meetup.id + "/chat", {method:"POST", body:JSON.stringify({memberId:S.memberId,text})});
     $("chatText").value = "";
     await refresh();
-    analyzeChat(text);
+
   } catch (e) { alert(e.message); }
-}
-
-async function analyzeChat(latestMessage) {
-  try {
-    const d = await api("/live/meetups/" + S.meetup.id + "/analyze", {
-      method:"POST",
-      body:JSON.stringify({message:latestMessage || undefined})
-    });
-    let result = d.result;
-    if (typeof result === "string") {
-      try { result = JSON.parse(result); } catch {}
-    }
-    if (result && typeof result === "object") {
-      const reply = result.reply ? "AI: " + result.reply + "\n\n" : "";
-      const constraints = Array.isArray(result.constraints) && result.constraints.length
-        ? "Constraints:\n• " + result.constraints.join("\n• ")
-        : "";
-      const conflicts = Array.isArray(result.conflicts) && result.conflicts.length
-        ? "\n\nConflicts:\n• " + result.conflicts.join("\n• ")
-        : "";
-      $("ai").innerHTML = '<div class="aiHeader">' + (d.fallback ? "MeetWise Smart Analysis" : "MeetWise AI") + '</div>' + esc(reply + constraints + conflicts) + (d.fallback ? '<div class="muted" style="margin-top:8px;font-size:12px">Gemini is unavailable, so MeetWise used local constraint analysis instead of stopping.</div>' : "");
-
-      // Apply only explicit, schema-shaped preference updates returned by the AI.
-      const allowed = new Set(["area","transportMode","budget","foodPreferences","activityPreferences","availableFrom","availableTo","maxTravelMinutes"]);
-      const updates = Array.isArray(result.preferenceUpdates) ? result.preferenceUpdates : [];
-      let applied = 0;
-      for (const item of updates) {
-        if (!item || typeof item.memberName !== "string" || !item.fields || typeof item.fields !== "object") continue;
-        const member = S.meetup.members.find(m => m.name.toLowerCase() === item.memberName.trim().toLowerCase());
-        if (!member) continue;
-        const patch = {};
-        for (const [key,value] of Object.entries(item.fields)) {
-          if (!allowed.has(key)) continue;
-          if (["area","transportMode","availableFrom","availableTo"].includes(key) && typeof value === "string" && value.trim()) patch[key]=value.trim();
-          else if (["budget","maxTravelMinutes"].includes(key) && Number.isFinite(Number(value))) patch[key]=Number(value);
-          else if (["foodPreferences","activityPreferences"].includes(key) && Array.isArray(value)) patch[key]=value.map(String).map(x=>x.trim()).filter(Boolean);
-        }
-        if (Object.keys(patch).length) {
-          await api("/meetups/" + S.meetup.id + "/members/" + member.id + "/preferences", {
-            method:"PATCH", body:JSON.stringify(patch)
-          });
-          applied++;
-        }
-      }
-      if (applied) {
-        await refresh(true);
-        const planTime = $("when")?.value ? localDateTimeToISO($("when").value) : undefined;
-        const replanned = await api("/meetups/" + S.meetup.id + "/replan", {
-          method:"POST",
-          body:JSON.stringify({reason:"AI extracted an explicit constraint from group chat",memberId:S.memberId,when:planTime})
-        });
-        S.meetup.finalPlan = replanned.plan;
-        renderPlan(replanned.plan);
-        $("status").textContent = "AI understood the new constraint and re-planned the meetup."; $("status").className="statusAI";
-      }
-    } else {
-      $("ai").innerHTML = '<div class="aiHeader">MeetWise analysis</div>' + esc(String(result ?? ""));
-    }
-  } catch (e) {
-    $("ai").innerHTML = '<div class="aiHeader">Analysis status</div>' + esc(e.message);
-  }
 }
 
 async function logout() {
@@ -498,3 +439,39 @@ async function logout() {
 
 if (S.token && S.user) home();
 else auth();
+
+
+async function copyInviteCode() {
+  const code = S.meetup?.inviteCode;
+  if (!code) return;
+  try {
+    await navigator.clipboard.writeText(code);
+    const status = $("inviteStatus");
+    if (status) {
+      status.textContent = "Invite code copied ✓";
+      status.className = "inviteStatus success";
+      setTimeout(() => { status.textContent = "Share this code with your group"; status.className = "inviteStatus"; }, 1800);
+    }
+  } catch {
+    const status = $("inviteStatus");
+    if (status) status.textContent = "Copy failed — select the code manually.";
+  }
+}
+
+async function shareInviteCode() {
+  const code = S.meetup?.inviteCode;
+  if (!code) return;
+  const text = "Join my MeetWise meetup: " + (S.meetup.title || "Group meetup") + "\nInvite code: " + code;
+  if (navigator.share) {
+    try { await navigator.share({title:"Join " + (S.meetup.title || "MeetWise meetup"),text}); return; } catch {}
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    const status = $("inviteStatus");
+    if (status) {
+      status.textContent = "Invite message copied ✓";
+      status.className = "inviteStatus success";
+      setTimeout(() => { status.textContent = "Share this code with your group"; status.className = "inviteStatus"; }, 1800);
+    }
+  } catch {}
+}
