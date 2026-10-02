@@ -17,6 +17,7 @@ const S = {
   autoPlanRunning: false
 };
 const $ = id => document.getElementById(id);
+const pendingInviteCode = (() => { const code = new URLSearchParams(window.location.search).get("invite"); return code ? code.trim().toUpperCase() : ""; })();
 const esc = x => String(x ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function localDateTimeToISO(value) {
   if (!value) return undefined;
@@ -69,7 +70,8 @@ async function login() {
 }
 
 function home() {
-  app.innerHTML = '<main class="shell"><div class="topBrand"><div><b class="brand">MeetWise</b><span class="brandTag">Your group planning space</span></div><button id="logout" class="secondary smallBtn">Log out</button></div><div class="welcomeBlock"><div><div class="heroBadge">READY WHEN YOUR GROUP IS</div><h1>Where should we meet?</h1><p class="muted">Create a meetup or join one with an invite code.</p></div></div><div class="homeGrid"><section class="card actionCard createCard"><div class="actionIcon">＋</div><div class="cardEyebrow">START A NEW PLAN</div><h2>Create a meetup</h2><p class="muted">Set the occasion, date and time, then invite everyone.</p><input id="title" placeholder="e.g. Saturday dinner with friends"><label class="fieldLabel">Meetup date & time</label><input id="scheduledAt" type="datetime-local"><button id="create" class="primaryAction">Create meetup <span>→</span></button></section><section class="card actionCard joinCard"><div class="actionIcon">↗</div><div class="cardEyebrow">JOIN YOUR GROUP</div><h2>Join a meetup</h2><p class="muted">Enter the invite code shared by your organizer.</p><input id="code" placeholder="6-character invite code" autocomplete="off"><input id="joinName" placeholder="Your name" value="' + esc(S.user?.name || "") + '"><button id="join" class="secondary fullAction">Join meetup <span>→</span></button></section></div></main>';
+  const inviteCode = pendingInviteCode;
+  app.innerHTML = '<main class="shell"><div class="topBrand"><div><b class="brand">MeetWise</b><span class="brandTag">Your group planning space</span></div><button id="logout" class="secondary smallBtn">Log out</button></div><div class="welcomeBlock"><div><div class="heroBadge">READY WHEN YOUR GROUP IS</div><h1>Where should we meet?</h1><p class="muted">Create a meetup or join one with an invite code.</p></div></div>' + (inviteCode ? '<div class="inviteJoinBanner"><div><b>You\'ve been invited 🎉</b><span>We found an invite code in your link. Just join your group below.</span></div><strong>' + esc(inviteCode) + '</strong></div>' : "") + '<div class="homeGrid"><section class="card actionCard createCard"><div class="actionIcon">＋</div><div class="cardEyebrow">START A NEW PLAN</div><h2>Create a meetup</h2><p class="muted">Set the occasion, date and time, then invite everyone.</p><input id="title" placeholder="e.g. Saturday dinner with friends"><label class="fieldLabel">Meetup date & time</label><input id="scheduledAt" type="datetime-local"><button id="create" class="primaryAction">Create meetup <span>→</span></button></section><section class="card actionCard joinCard"><div class="actionIcon">↗</div><div class="cardEyebrow">JOIN YOUR GROUP</div><h2>Join a meetup</h2><p class="muted">Enter the invite code shared by your organizer.</p><input id="code" placeholder="6-character invite code" autocomplete="off" value="' + esc(inviteCode) + '"><input id="joinName" placeholder="Your name" value="' + esc(S.user?.name || "") + '"><button id="join" class="secondary fullAction">Join meetup <span>→</span></button></section></div></main>';
   $("logout").onclick = logout;
   $("create").onclick = createMeetup;
   $("join").onclick = joinMeetup;
@@ -488,11 +490,14 @@ async function shareInviteWhatsApp() {
   const code = S.meetup?.inviteCode;
   if (!code) return;
   const title = S.meetup?.title || "Group meetup";
-  const text = "Join my MeetWise meetup: " + title + "\nInvite code: " + code + "\n\nOpen MeetWise and enter this invite code to join.";
+  const joinUrl = new URL(window.location.href);
+  joinUrl.search = "";
+  joinUrl.hash = "";
+  joinUrl.searchParams.set("invite", code);
+  const text = "Join my MeetWise meetup 🎉\n" + title + "\n\nOpen this link to join:\n" + joinUrl.toString() + "\n\nYour invite code is already included — just tap Join Meetup.";
   const url = "https://wa.me/?text=" + encodeURIComponent(text);
   window.open(url, "_blank", "noopener");
 }
-
 async function shareInviteCode() {
   const code = S.meetup?.inviteCode;
   if (!code) return;
