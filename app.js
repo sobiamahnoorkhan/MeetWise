@@ -354,16 +354,34 @@ function renderMap() {
   if(status) status.textContent=points.length ? "Member locations and researched meetup places are shown on the map." : "Save an area first, then research live options.";
 }
 
-function useCurrentLocation() {
+async function useCurrentLocation() {
   if (!navigator.geolocation) { $("locationStatus").textContent="Browser location is unavailable."; return; }
-  $("locationStatus").textContent="Getting your location...";
+  $("locationStatus").textContent="Getting your precise location...";
   navigator.geolocation.getCurrentPosition(async pos=>{
     const lat=pos.coords.latitude, lon=pos.coords.longitude;
-    $("area").value=lat.toFixed(5)+", "+lon.toFixed(5);
     S.selectedLocation = { latitude: lat, longitude: lon };
-    $("locationStatus").textContent="Location selected. Save preferences.";
+    $("area").value = lat.toFixed(5) + ", " + lon.toFixed(5);
+    $("locationStatus").textContent="Location found. Getting the area name...";
+    try {
+      const r = await fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat="+encodeURIComponent(lat)+"&lon="+encodeURIComponent(lon)+"&zoom=18&addressdetails=1", {headers:{"Accept":"application/json"}});
+      const d = await r.json();
+      const a = d.address || {};
+      const readable = [a.neighbourhood || a.suburb || a.quarter, a.city || a.town || a.village, a.state].filter(Boolean).join(", ");
+      if (readable) $("area").value = readable;
+      $("locationStatus").innerHTML = "✓ Location selected · <button type=\"button\" id=\"openMyLocation\" class=\"inlineLink\">Open location</button>";
+      $("openMyLocation").onclick = () => openMapLocation(lat, lon);
+    } catch {
+      $("locationStatus").innerHTML = "✓ Location selected · <button type=\"button\" id=\"openMyLocation\" class=\"inlineLink\">Open location</button>";
+      $("openMyLocation").onclick = () => openMapLocation(lat, lon);
+    }
     S.prefsDirty=true;
-  },()=>{$("locationStatus").textContent="Location permission denied or unavailable.";});
+  },err=>{
+    $("locationStatus").textContent = err.code === 1 ? "Location permission was denied. Allow location access in your browser." : "Could not get your current location. Try again.";
+  },{enableHighAccuracy:true,timeout:12000,maximumAge:60000});
+}
+function openMapLocation(lat, lon) {
+  const url = "https://www.openstreetmap.org/?mlat=" + encodeURIComponent(lat) + "&mlon=" + encodeURIComponent(lon) + "#map=18/" + encodeURIComponent(lat) + "/" + encodeURIComponent(lon);
+  window.open(url, "_blank", "noopener");
 }
 
 function renderVotingPanel() {
