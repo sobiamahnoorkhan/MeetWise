@@ -41,9 +41,18 @@ function saveAuth(d) {
 }
 
 function auth() {
-  app.innerHTML = '<main class="shell"><div class="brand">MeetWise AI</div><div class="grid"><section class="card"><h1>Plan together. Smarter.</h1><p class="muted">AI-powered group meetup planning.</p><input id="sn" placeholder="Name"><input id="se" placeholder="Email"><input id="sp" type="password" placeholder="Password (8+ characters)"><button id="signup">Create account</button></section><section class="card"><h2>Log in</h2><input id="le" placeholder="Email"><input id="lp" type="password" placeholder="Password"><button id="login">Log in</button><p id="msg"></p></section></div></main>';
-  $("signup").onclick = signup;
-  $("login").onclick = login;
+  app.innerHTML = '<main class="authShell"><section class="authHero"><div class="brandMark"><span>MW</span> MeetWise</div><div class="heroCopy"><span class="eyebrow">GROUP PLANNING, SIMPLIFIED</span><h1>Plan once.<br><span>Enjoy together.</span></h1><p>Bring everyone's preferences, locations and votes into one beautiful meetup workspace.</p><div class="heroPoints"><span>✓ Smart group matching</span><span>✓ Live place research</span><span>✓ Shared voting</span></div></div></section><section class="authPanel"><div class="authTabs"><button id="tabLogin" class="authTab active" type="button">Log in</button><button id="tabSignup" class="authTab" type="button">Create account</button></div><div id="authForm"></div></section></main>';
+  const renderAuth = mode => {
+    const signupMode = mode === "signup";
+    $("authForm").innerHTML = signupMode
+      ? '<div class="formIntro"><h2>Create your MeetWise</h2><p class="muted">Start planning your next group meetup.</p></div><input id="sn" placeholder="Your name" autocomplete="name"><input id="se" placeholder="Email address" type="email" autocomplete="email"><input id="sp" type="password" placeholder="Password (8+ characters)" autocomplete="new-password"><button id="signup" class="primaryAction">Create account <span>→</span></button><p id="msg" class="formMsg"></p>'
+      : '<div class="formIntro"><h2>Welcome back</h2><p class="muted">Continue planning with your group.</p></div><input id="le" placeholder="Email address" type="email" autocomplete="email"><input id="lp" type="password" placeholder="Password" autocomplete="current-password"><button id="login" class="primaryAction">Log in <span>→</span></button><p id="msg" class="formMsg"></p>';
+    if (signupMode) $("signup").onclick = signup;
+    else $("login").onclick = login;
+  };
+  $("tabLogin").onclick = () => { $("tabLogin").classList.add("active"); $("tabSignup").classList.remove("active"); renderAuth("login"); };
+  $("tabSignup").onclick = () => { $("tabSignup").classList.add("active"); $("tabLogin").classList.remove("active"); renderAuth("signup"); };
+  renderAuth("login");
 }
 
 async function signup() {
@@ -61,7 +70,7 @@ async function login() {
 }
 
 function home() {
-  app.innerHTML = '<main class="shell"><div class="nav"><b class="brand">MeetWise AI</b><button id="logout" class="secondary" style="width:auto">Log out</button></div><div class="grid"><section class="card"><h2>Create meetup</h2><input id="title" placeholder="Saturday evening meetup"><label class="muted">Meetup date & time</label><input id="scheduledAt" type="datetime-local"><button id="create">Create & invite</button></section><section class="card"><h2>Join meetup</h2><input id="code" placeholder="Invite code"><input id="joinName" placeholder="Your name"><button id="join">Join</button></section></div></main>';
+  app.innerHTML = '<main class="shell homeShell"><div class="topbar"><div class="brandMark"><span>MW</span> MeetWise</div><div class="userChip"><span class="avatar">' + esc((S.user?.name || "U").slice(0,1).toUpperCase()) + '</span><span>' + esc(S.user?.name || "Member") + '</span><button id="logout" class="iconButton" title="Log out">↗</button></div></div><section class="welcomeHero"><div><span class="eyebrow">YOUR GROUP, YOUR PLAN</span><h1>Make plans everyone<br><span>will love.</span></h1><p>Choose a meetup, invite your group, share preferences and let MeetWise find the best options.</p></div><div class="heroOrb"><span>MW</span></div></section><div class="homeGrid"><section class="card actionCard"><div class="sectionIcon">＋</div><h2>Create a meetup</h2><p class="muted">Start a new group plan and invite everyone.</p><input id="title" placeholder="e.g. Saturday dinner"><label class="muted">Meetup date & time</label><input id="scheduledAt" type="datetime-local"><button id="create" class="primaryAction">Create meetup <span>→</span></button></section><section class="card actionCard"><div class="sectionIcon joinIcon">↗</div><h2>Join a meetup</h2><p class="muted">Have an invite code? Jump right in.</p><input id="code" placeholder="Enter invite code" autocapitalize="characters"><input id="joinName" placeholder="Your name"><button id="join" class="secondaryAction">Join meetup <span>→</span></button></section></div></main>';
   $("logout").onclick = logout;
   $("create").onclick = createMeetup;
   $("join").onclick = joinMeetup;
@@ -88,16 +97,13 @@ async function joinMeetup() {
 }
 
 function dashboard() {
-  app.innerHTML = '<main class="shell"><div class="nav"><div><b class="brand">MeetWise AI</b><div id="meetupTitle" class="muted"></div></div><span id="invite" class="pill"></span></div><div id="meetupReminder" class="muted"></div><div class="grid"><section class="card"><h3>Members</h3><div id="members"></div><h3>Your preferences</h3><div class="row"><input id="area" placeholder="Area / neighborhood"><button id="useLocation" type="button" class="secondary" style="max-width:150px">Use my location</button></div><p id="locationStatus" class="muted"></p><select id="transport"><option value="">Transport</option><option value="walking">Walking</option><option value="bike">Bike</option><option value="car">Car</option><option value="public_transport">Public transport</option></select><input id="budget" type="number" placeholder="Budget PKR"><input id="maxTravel" type="number" placeholder="Max travel minutes"><input id="food" placeholder="Food preferences"><input id="activity" placeholder="Activity preferences"><input id="when" type="datetime-local"><button id="savePrefs">Save preferences</button><button id="research" class="secondary">Research live options</button><button id="replan" class="secondary">Re-plan</button><p id="status" class="muted"></p></section><section class="card"><h3>Group chat</h3><div id="chat" class="chat"></div><div class="row"><input id="chatText" placeholder="Message or new constraint"><button id="send" style="max-width:120px">Send</button></div><button id="analyze" class="secondary">AI constraint analysis</button><pre id="ai" style="white-space:pre-wrap"></pre></section></div><section class="card" style="margin-top:18px"><h2>Live Group Preferences</h2><div id="livePrefs" class="livePrefs"></div><p id="syncStatus" class="muted">Live sync enabled</p></section><section class="card" style="margin-top:18px"><h2>AI Meetup Plan</h2><div id="results" class="emptyState">Save preferences and run research.</div></section><section class="card" style="margin-top:18px"><h2>Meetup Map</h2><div id="meetupMap" class="map"></div><p id="mapStatus" class="muted">Save a member location to place it on the map.</p></section><section class="card" style="margin-top:18px"><h2>Group Voting</h2><div id="votingPanel" class="votingPanel"><div class="emptyState">Run live research to create voting options.</div></div></section></main>';
-  $("meetupTitle").textContent = S.meetup.title;
-  $("invite").innerHTML = "Invite: <b>" + esc(S.meetup.inviteCode) + "</b>";
-  setupMeetupReminder();
+  app.innerHTML = '<main class="shell dashboardShell"><header class="dashboardNav"><div class="brandMark"><span>MW</span> MeetWise</div><nav class="quickNav"><a href="#overview">Overview</a><a href="#planSection">Plan</a><a href="#chatSection">Chat</a><a href="#mapSection">Map</a><a href="#voteSection">Vote</a></nav><div class="navActions"><span id="invite" class="invitePill"></span><button id="logout" class="iconButton" title="Log out">↗</button></div></header><section id="overview" class="dashboardHero"><div><span class="eyebrow">GROUP WORKSPACE</span><h1 id="meetupTitle">Meetup</h1><p class="muted">Everything your group needs, in one place.</p></div><div id="meetupReminder" class="reminderPill"></div></section><section class="statsStrip"><div><strong id="memberCount">0</strong><span>Members</span></div><div><strong id="readyCount">0</strong><span>Ready</span></div><div><strong id="optionCount">0</strong><span>Options</span></div><div><strong id="voteCount">0</strong><span>Votes</span></div></section><div class="dashboardGrid"><section class="card" id="preferencesSection"><div class="cardHeading"><div><span class="eyebrow">01 · YOUR INPUT</span><h2>Your preferences</h2></div><span class="statusDot">Live</span></div><div id="members" class="memberList"></div><div class="prefForm"><div class="row"><div class="fieldGrow"><label>Area / neighborhood</label><input id="area" placeholder="e.g. Latifabad, Clifton"></div><button id="useLocation" type="button" class="secondaryAction locationButton">⌖ Use my location</button></div><p id="locationStatus" class="fieldHint"></p><div class="formGrid"><div><label>Transport</label><select id="transport"><option value="">Choose transport</option><option value="walking">Walking</option><option value="bike">Bike</option><option value="car">Car</option><option value="public_transport">Public transport</option></select></div><div><label>Budget (PKR)</label><input id="budget" type="number" min="0" placeholder="e.g. 2500"></div><div><label>Max travel (minutes)</label><input id="maxTravel" type="number" min="0" placeholder="e.g. 30"></div><div><label>Available from</label><input id="when" type="datetime-local"></div><div class="wideField"><label>Food preferences</label><input id="food" placeholder="Pizza, desi, coffee..."></div><div class="wideField"><label>Activity preferences</label><input id="activity" placeholder="Dinner, cafe, bowling..."></div></div><div class="actionRow"><button id="savePrefs" class="primaryAction">Save preferences</button><button id="research" class="secondaryAction">Find live options</button><button id="replan" class="ghostAction">Re-plan</button></div><p id="status" class="fieldHint"></p></div></section><section class="card chatCard" id="chatSection"><div class="cardHeading"><div><span class="eyebrow">02 · GROUP CHAT</span><h2>Talk it out</h2></div><span class="statusDot">Live sync</span></div><div id="chat" class="chat"></div><div class="chatComposer"><input id="chatText" placeholder="Share a preference or message..."><button id="send" class="sendButton" title="Send">↑</button></div></section></div><section class="card" id="liveSection"><div class="cardHeading"><div><span class="eyebrow">03 · EVERYONE</span><h2>Live group preferences</h2></div><span id="syncStatus" class="fieldHint">Syncing...</span></div><div id="livePrefs" class="livePrefs"></div></section><section class="card" id="planSection"><div class="cardHeading"><div><span class="eyebrow">04 · RECOMMENDATIONS</span><h2>AI Meetup Plan</h2></div><span class="planBadge">LIVE RESEARCH</span></div><div id="results" class="emptyState">Save preferences and find live options.</div></section><section class="card" id="mapSection"><div class="cardHeading"><div><span class="eyebrow">05 · LOCATIONS</span><h2>Meetup map</h2></div></div><div id="meetupMap" class="map"></div><p id="mapStatus" class="fieldHint">Save a member location to place it on the map.</p></section><section class="card" id="voteSection"><div class="cardHeading"><div><span class="eyebrow">06 · DECIDE TOGETHER</span><h2>Group voting</h2></div><span class="planBadge">LIVE</span></div><div id="votingPanel" class="votingPanel"><div class="emptyState">Run live research to create voting options.</div></div></section></main>';
+  $("logout").onclick = logout;
   $("savePrefs").onclick = savePrefs;
   $("useLocation").onclick = useCurrentLocation;
   $("research").onclick = research;
   $("replan").onclick = replan;
   $("send").onclick = sendChat;
-  $("analyze").onclick = analyzeChat;
   ["area","transport","budget","maxTravel","food","activity","when"].forEach(id => {
     $(id).addEventListener("input", () => { S.prefsDirty = true; });
     $(id).addEventListener("change", () => { S.prefsDirty = true; });
@@ -192,33 +198,43 @@ async function refresh(silent = false) {
 }
 
 function renderMembers() {
-  $("members").innerHTML = S.meetup.members.map(m => {
-    const p = m.preferences || {};
-    const ready = !!(p.area || (p.foodPreferences || []).length || (p.activityPreferences || []).length);
-    return '<span class="pill ' + (ready ? "pillReady" : "") + '">' + esc(m.name) + (ready ? " ✓" : " · pending") + "</span>";
-  }).join("");
+  const members = S.meetup.members || [];
+  const ready = members.filter(m => {
+    const p=m.preferences||{};
+    return !!(p.area || Number.isFinite(p.latitude) || (p.foodPreferences||[]).length || (p.activityPreferences||[]).length);
+  }).length;
+  if ($("memberCount")) $("memberCount").textContent = members.length;
+  if ($("readyCount")) $("readyCount").textContent = ready;
+  $("members").innerHTML = members.map(m => {
+    const p=m.preferences||{};
+    const isReady=!!(p.area || Number.isFinite(p.latitude) || (p.foodPreferences||[]).length || (p.activityPreferences||[]).length);
+    return '<div class="memberItem"><span class="avatar">' + esc((m.name||"M").slice(0,1).toUpperCase()) + '</span><div><b>' + esc(m.name) + '</b><span>' + (m.id===S.memberId ? "You" : (isReady ? "Preferences ready" : "Waiting for preferences")) + '</span></div><i class="' + (isReady ? "ready" : "") + '"></i></div>';
+  }).join("") || '<div class="emptyState">No members yet.</div>';
 }
 
 function renderLivePreferences() {
   const el = $("livePrefs");
   if (!el || !S.meetup?.members) return;
   el.innerHTML = S.meetup.members.map(m => {
-    const p = m.preferences || {};
-    const foods = (p.foodPreferences || []).join(", ") || "—";
-    const activities = (p.activityPreferences || []).join(", ") || "—";
-    const transport = p.transportMode || "—";
-    const budget = p.budget ? "PKR " + p.budget : "—";
-    const travel = p.maxTravelMinutes ? p.maxTravelMinutes + " min" : "—";
-    const when = p.availableFrom ? new Date(p.availableFrom).toLocaleString() : "—";
-    return `<div class="candidate"><div><b>${esc(m.name)}</b> ${m.id === S.memberId ? "<span class=\"pill pillReady\">You</span>" : ""}</div><p class="muted">Area: ${esc(p.area || "—")} · Transport: ${esc(transport)} · Budget: ${esc(budget)} · Max travel: ${esc(travel)}</p><p>Food: ${esc(foods)} · Activity: ${esc(activities)}</p><p class="muted">Availability: ${esc(when)}</p></div>`;
-  }).join("") || "<div class=\"emptyState\">No members yet.</div>";
+    const p=m.preferences||{};
+    const foods=(p.foodPreferences||[]).join(", ") || "No preference";
+    const activities=(p.activityPreferences||[]).join(", ") || "No preference";
+    const transport=p.transportMode || "Flexible";
+    const budget=p.budget ? "PKR " + p.budget : "Flexible";
+    const travel=p.maxTravelMinutes ? p.maxTravelMinutes + " min" : "Flexible";
+    return '<article class="liveMember"><div class="liveMemberTop"><span class="avatar">' + esc((m.name||"M").slice(0,1).toUpperCase()) + '</span><div><b>' + esc(m.name) + '</b>' + (m.id===S.memberId ? '<span class="youBadge">You</span>' : '') + '</div></div><div class="preferenceTags"><span>⌖ ' + esc(p.area||"Location pending") + '</span><span>↗ ' + esc(transport) + '</span><span>₨ ' + esc(budget) + '</span><span>◷ ' + esc(travel) + '</span></div><p><b>Food:</b> ' + esc(foods) + ' · <b>Activity:</b> ' + esc(activities) + '</p></article>';
+  }).join("") || '<div class="emptyState">No members yet.</div>';
 }
 
 function renderChat() {
-  $("chat").innerHTML = S.meetup.chat.map(x => {
-    const m = S.meetup.members.find(v => v.id === x.memberId);
-    return '<div class="msg"><b>' + esc(m?.name || "Member") + ":</b> " + esc(x.text) + "</div>";
-  }).join("");
+  const chat=$("chat");
+  if (!chat) return;
+  chat.innerHTML = S.meetup.chat.map(x => {
+    const m=S.meetup.members.find(v=>v.id===x.memberId);
+    const mine=x.memberId===S.memberId;
+    return '<div class="chatMsg ' + (mine ? "mine" : "") + '"><div class="chatAvatar">' + esc((m?.name||"M").slice(0,1).toUpperCase()) + '</div><div><span class="chatName">' + esc(m?.name||"Member") + '</span><div class="bubble">' + esc(x.text) + '</div></div></div>';
+  }).join("") || '<div class="chatEmpty">No messages yet. Start the conversation.</div>';
+  chat.scrollTop=chat.scrollHeight;
 }
 
 function fillPrefs() {
@@ -363,25 +379,26 @@ function useCurrentLocation() {
 }
 
 function renderVotingPanel() {
-  const el = $("votingPanel");
+  const el=$("votingPanel");
   if (!el) return;
-  // Always rebuild from the server-persisted plan. Do not depend on the
-  // browser that originally performed the research.
-  if (S.meetup?.finalPlan?.status === "ready") {
-    S.candidates = (S.meetup.finalPlan.candidates || []).map(x => ({id:x.candidate.id,name:x.candidate.name,address:x.candidate.address||"Address unavailable"}));
+  if (S.meetup?.finalPlan?.status==="ready") {
+    S.candidates=(S.meetup.finalPlan.candidates||[]).map(x=>({id:x.candidate.id,name:x.candidate.name,address:x.candidate.address||"Address unavailable"}));
   }
-  if (!S.candidates.length) {
-    el.innerHTML = "<div class=\"emptyState\">Save member locations and run live research to create voting options.</div>";
-    return;
-  }
-  const votes = S.meetup?.votes || [];
-  const totalMembers = S.meetup?.members?.length || 0;
-  el.innerHTML = S.candidates.map(c => {
-    const count = votes.filter(v => v.optionId === c.id).length;
-    const mine = votes.some(v => v.memberId === S.memberId && v.optionId === c.id);
-    return `<div class="candidate"><div class="score">${count} vote${count === 1 ? "" : "s"} · ${totalMembers ? Math.round(count / totalMembers * 100) : 0}% of members</div><h3>${esc(c.name)}</h3><p class="muted">${esc(c.address)}</p><button data-panel-vote="${esc(c.id)}">${mine ? "✓ Your vote" : "Vote for this option"}</button></div>`;
-  }).join("");
-  el.querySelectorAll("[data-panel-vote]").forEach(b => b.onclick = () => vote(b.dataset.panelVote));
+  if (!S.candidates.length) { el.innerHTML='<div class="emptyState">Save member locations and find live options to start voting.</div>'; return; }
+  const votes=S.meetup?.votes||[];
+  const totalMembers=S.meetup?.members?.length||0;
+  const ranked=S.candidates.map(c=>{
+    const count=votes.filter(v=>v.optionId===c.id).length;
+    const mine=votes.some(v=>v.memberId===S.memberId&&v.optionId===c.id);
+    return {...c,count,mine,percent:totalMembers?Math.round(count/totalMembers*100):0};
+  }).sort((a,b)=>b.count-a.count);
+  const max=ranked[0]?.count||0;
+  if ($("voteCount")) $("voteCount").textContent=votes.length;
+  el.innerHTML='<div class="voteIntro"><div><b>Pick your favourite</b><span>' + totalMembers + ' member' + (totalMembers===1?"":"s") + ' · live results</span></div><span class="pill">' + votes.length + ' vote' + (votes.length===1?"":"s") + '</span></div><div class="voteGrid">' + ranked.map((c,i)=>{
+    const leader=max>0&&c.count===max;
+    return '<article class="voteCard ' + (c.mine?"selected ":"") + '"><div class="voteTop"><span class="rankBadge">#' + (i+1) + '</span>' + (leader?'<span class="leaderBadge">Leading</span>':'') + '</div><h3>' + esc(c.name) + '</h3><p class="muted">' + esc(c.address) + '</p><div class="voteMetric"><strong>' + c.count + '</strong><span>vote' + (c.count===1?"":"s") + '</span><b>' + c.percent + '%</b></div><div class="voteBar"><span style="width:' + c.percent + '%"></span></div><button class="' + (c.mine?"selectedButton":"") + '" data-panel-vote="' + esc(c.id) + '">' + (c.mine?"✓ Your vote":"Vote for this") + '</button></article>';
+  }).join("") + '</div>';
+  el.querySelectorAll("[data-panel-vote]").forEach(b=>b.onclick=()=>vote(b.dataset.panelVote));
 }
 
 async function vote(id) {
@@ -406,81 +423,24 @@ async function voteSummary() {
 }
 
 async function sendChat() {
-  const text = $("chatText").value.trim();
+  const input=$("chatText");
+  const text=input.value.trim();
   if (!text) return;
   try {
-    await api("/meetups/" + S.meetup.id + "/chat", {method:"POST", body:JSON.stringify({memberId:S.memberId,text})});
-    $("chatText").value = "";
+    input.disabled=true;
+    await api("/meetups/" + S.meetup.id + "/chat",{method:"POST",body:JSON.stringify({memberId:S.memberId,text})});
+    input.value="";
     await refresh();
-    analyzeChat(text);
-  } catch (e) { alert(e.message); }
-}
-
-async function analyzeChat(latestMessage) {
-  try {
-    const d = await api("/live/meetups/" + S.meetup.id + "/analyze", {
-      method:"POST",
-      body:JSON.stringify({message:latestMessage || undefined})
-    });
-    let result = d.result;
-    if (typeof result === "string") {
-      try { result = JSON.parse(result); } catch {}
-    }
-    if (result && typeof result === "object") {
-      const reply = result.reply ? "AI: " + result.reply + "\n\n" : "";
-      const constraints = Array.isArray(result.constraints) && result.constraints.length
-        ? "Constraints:\n• " + result.constraints.join("\n• ")
-        : "";
-      const conflicts = Array.isArray(result.conflicts) && result.conflicts.length
-        ? "\n\nConflicts:\n• " + result.conflicts.join("\n• ")
-        : "";
-      $("ai").textContent = reply + constraints + conflicts;
-
-      // Apply only explicit, schema-shaped preference updates returned by the AI.
-      const allowed = new Set(["area","transportMode","budget","foodPreferences","activityPreferences","availableFrom","availableTo","maxTravelMinutes"]);
-      const updates = Array.isArray(result.preferenceUpdates) ? result.preferenceUpdates : [];
-      let applied = 0;
-      for (const item of updates) {
-        if (!item || typeof item.memberName !== "string" || !item.fields || typeof item.fields !== "object") continue;
-        const member = S.meetup.members.find(m => m.name.toLowerCase() === item.memberName.trim().toLowerCase());
-        if (!member) continue;
-        const patch = {};
-        for (const [key,value] of Object.entries(item.fields)) {
-          if (!allowed.has(key)) continue;
-          if (["area","transportMode","availableFrom","availableTo"].includes(key) && typeof value === "string" && value.trim()) patch[key]=value.trim();
-          else if (["budget","maxTravelMinutes"].includes(key) && Number.isFinite(Number(value))) patch[key]=Number(value);
-          else if (["foodPreferences","activityPreferences"].includes(key) && Array.isArray(value)) patch[key]=value.map(String).map(x=>x.trim()).filter(Boolean);
-        }
-        if (Object.keys(patch).length) {
-          await api("/meetups/" + S.meetup.id + "/members/" + member.id + "/preferences", {
-            method:"PATCH", body:JSON.stringify(patch)
-          });
-          applied++;
-        }
-      }
-      if (applied) {
-        await refresh(true);
-        const planTime = $("when")?.value ? localDateTimeToISO($("when").value) : undefined;
-        const replanned = await api("/meetups/" + S.meetup.id + "/replan", {
-          method:"POST",
-          body:JSON.stringify({reason:"AI extracted an explicit constraint from group chat",memberId:S.memberId,when:planTime})
-        });
-        S.meetup.finalPlan = replanned.plan;
-        renderPlan(replanned.plan);
-        $("status").textContent = "AI understood the new constraint and re-planned the meetup.";
-      }
-    } else {
-      $("ai").textContent = String(result ?? "");
-    }
-  } catch (e) {
-    $("ai").textContent = e.message;
-  }
+  } catch(e) { alert(e.message); }
+  finally { input.disabled=false; input.focus(); }
 }
 
 async function logout() {
   if (S.liveTimer) clearInterval(S.liveTimer);
-  try { await api("/auth/logout", {method:"POST"}); } catch {}
-  localStorage.clear();
+  try { await api("/auth/logout",{method:"POST"}); } catch {}
+  localStorage.removeItem("meetwise_token");
+  localStorage.removeItem("meetwise_user");
+  localStorage.removeItem("meetwise_member");
   location.reload();
 }
 
