@@ -460,7 +460,7 @@ function selectManualLocation(item) {
   $("area").value = readable || item.display_name || $("locationSearch").value.trim();
   $("locationSearch").value = "";
   if ($("locationSuggestions")) $("locationSuggestions").innerHTML = "";
-  $("locationStatus").innerHTML = "✓ Location selected · <button type="button" id="openMyLocation" class="inlineLink">Open location</button>";
+  $("locationStatus").innerHTML = '✓ Location selected · <button type="button" id="openMyLocation" class="inlineLink">Open location</button>';
   $("openMyLocation").onclick = () => openMapLocation(lat, lon);
   S.prefsDirty = true;
 }
