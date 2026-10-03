@@ -320,46 +320,26 @@ async function replan() {
 }
 
 function renderPlan(d) {
-  S.candidates = [];
-  if (d.status === "needs_input") {
-    $("results").innerHTML = '<div class="emptyState"><b>More information is needed</b><p>' + esc((d.missingData || []).join(", ")) + "</p></div>";
-    return;
-  }
-  if (d.status === "no_results") {
-    $("results").innerHTML = '<div class="emptyState"><b>No live places found.</b><p>Try a broader area or simpler preferences.</p></div>';
-    return;
-  }
-  if (d.status !== "ready") {
-    $("results").textContent = d.status || "Planning unavailable";
-    return;
-  }
-  let html = '<div class="planMeta"><span class="pill">Goal: ' + esc(d.goal) + '</span><span class="pill">Source: ' + esc(d.source) + "</span></div>";
-  if (d.center) html += '<p class="muted"><b>Fair meeting center:</b> ' + Number(d.center.latitude).toFixed(4) + ", " + Number(d.center.longitude).toFixed(4) + ' · candidates are searched around the shared center.</p>';
-  html += '<p class="muted">' + esc(d.objective || "") + "</p>";
-  const candidates = d.candidates || [];
-  if (candidates.length) {
-    html += '<div class="placesHeader"><div><h3>Recommended places</h3><p class="muted">Choose from the best group-friendly options.</p></div><span class="pill">' + candidates.length + ' options</span></div><div class="placesGrid">';
-  }
-  candidates.forEach((x, i) => {
-    const travel = (x.travelByMember || x.travel || []).map(t => {
-      const name = t.memberName || S.meetup.members.find(v => v.id === t.memberId)?.name || "Member";
-      const distance = Number.isFinite(t.distanceMeters) ? " · " + (t.distanceMeters / 1000).toFixed(1) + " km" : "";
-      return '<span class="pill">' + esc(name) + ": " + (t.durationMinutes ?? "unknown") + " min" + distance + "</span>";
-    }).join("");
-    const weather = x.weather?.available ? '<p class="weather"><b>Weather:</b> ' + esc(x.weather.summary || "Forecast available") + "</p>" : "";
-    const fairness = '<div class="placeStats"><span class="pill">Fairness ' + (x.fairnessScore ?? "—") + '%</span><span class="pill">Longest ' + (x.maxTravelMinutes ?? "—") + ' min</span></div>';
-    const availability = '<p class="muted"><b>Venue:</b> ' + esc(x.availabilityStatus || "Not verified") + '</p>';
-    const venueInfo = '<p class="muted">' + (x.candidate.openingHours ? 'Hours: ' + esc(x.candidate.openingHours) : 'Hours: not listed') + (x.candidate.cuisine ? ' · ' + esc(x.candidate.cuisine) : '') + '</p>';
-    const details = '<details><summary>View travel & details</summary><p>' + travel + '</p>' + fairness + availability + venueInfo + weather + '<p>' + (x.explanation || []).map(esc).join(" · ") + '</p><p class="muted">' + esc(x.budgetStatus || "Budget not verified") + '</p></details>';
-    const directions = 'https://www.openstreetmap.org/directions?to=' + encodeURIComponent(Number(x.candidate.latitude).toFixed(6) + ',' + Number(x.candidate.longitude).toFixed(6));
-    html += '<article class="placeCard"><div class="placeTop"><span class="optionBadge">Option ' + (i + 1) + '</span><span class="scoreBadge">' + (x.score === null ? "Verified" : x.score + "% match") + '</span></div><h3>' + esc(x.candidate.name) + '</h3><p class="placeAddress">' + esc(x.candidate.address || "Address unavailable") + '</p>' + details + '<div class="placeActions"><a href="' + directions + '" target="_blank" rel="noopener" class="mapLink">Open directions</a><button data-vote="' + esc(x.candidate.id) + '">Vote</button></div></article>';
+  S.candidates=[];
+  if(d.status==="needs_input"){ $("results").innerHTML='<div class="emptyState"><b>More information is needed</b><p>'+esc((d.missingData||[]).join(", "))+'</p></div>'; return; }
+  if(d.status==="no_results"){ $("results").innerHTML='<div class="emptyState"><b>No live places found.</b><p>Try a broader area or simpler preferences.</p></div>'; return; }
+  if(d.status!=="ready"){ $("results").textContent=d.status||"Planning unavailable"; return; }
+  const candidates=d.candidates||[];
+  let html='<div class="planMeta"><span class="pill">Goal: '+esc(d.goal)+'</span><span class="pill">'+candidates.length+' options</span></div>';
+  if(d.center) html+='<p class="muted planCenter">Fair meeting center · '+Number(d.center.latitude).toFixed(4)+", "+Number(d.center.longitude).toFixed(4)+'</p>';
+  html+='<div class="placesHeader"><div><h3>Recommended places</h3><p class="muted">Pick a place your group likes.</p></div></div><div class="placesGrid compactPlaces">';
+  candidates.forEach((x,i)=>{
+    const p=x.candidate||{}, travel=x.travelByMember||x.travel||[];
+    const avg=travel.length?Math.round(travel.reduce((a,t)=>a+Number(t.durationMinutes||0),0)/travel.length):null;
+    const directions='https://www.openstreetmap.org/directions?to='+encodeURIComponent(Number(p.latitude).toFixed(6)+','+Number(p.longitude).toFixed(6));
+    const details='<details><summary>More details</summary><div class="compactDetails"><p><b>Travel:</b> '+(avg!==null?avg+" min average":"Not available")+'</p><p><b>Fairness:</b> '+(x.fairnessScore??"—")+'% · <b>Longest:</b> '+(x.maxTravelMinutes??"—")+' min</p><p><b>Venue:</b> '+esc(x.availabilityStatus||"Not verified")+'</p><p>'+esc(x.budgetStatus||"Budget not verified")+'</p>'+(p.openingHours?'<p><b>Hours:</b> '+esc(p.openingHours)+'</p>':"")+(p.cuisine?'<p><b>Cuisine:</b> '+esc(p.cuisine)+'</p>':"")+'</div></details>';
+    html+='<article class="placeCard compactPlaceCard"><div class="placeTop"><span class="optionBadge">Option '+(i+1)+'</span><span class="scoreBadge">'+(x.score===null?"Verified":x.score+"% match")+'</span></div><h3>'+esc(p.name)+'</h3><p class="placeAddress">'+esc(p.address||"Address unavailable")+'</p><div class="compactPlaceMeta"><span>⌖ '+(avg!==null?avg+" min":"—")+'</span><span>⚖ '+(x.fairnessScore??"—")+'%</span></div>'+details+'<div class="placeActions"><a href="'+directions+'" target="_blank" rel="noopener" class="mapLink">Directions</a><button data-vote="'+esc(p.id)+'">Vote</button></div></article>';
   });
-  if (candidates.length) html += '</div>';
-  S.candidates = (d.candidates || []).map(x => ({id:x.candidate.id, name:x.candidate.name, address:x.candidate.address || "Address unavailable"}));
-  $("results").innerHTML = html;
-  $("results").querySelectorAll("[data-vote]").forEach(b => b.onclick = () => vote(b.dataset.vote));
-  renderVotingPanel();
-  renderMap();
+  html+='</div>';
+  S.candidates=candidates.map(x=>({id:x.candidate.id,name:x.candidate.name,address:x.candidate.address||"Address unavailable"}));
+  $("results").innerHTML=html;
+  $("results").querySelectorAll("[data-vote]").forEach(b=>b.onclick=()=>vote(b.dataset.vote));
+  renderVotingPanel(); renderMap();
 }
 
 function renderMap() {
