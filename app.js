@@ -356,30 +356,37 @@ function renderPlan(d) {
     $("results").textContent = d.status || "Planning unavailable";
     return;
   }
-  let html = '<div class="planMeta"><span class="pill">Goal: ' + esc(d.goal) + '</span><span class="pill">Source: ' + esc(d.source) + "</span></div>";
-  if (d.center) html += '<p class="muted"><b>Fair meeting center:</b> ' + Number(d.center.latitude).toFixed(4) + ", " + Number(d.center.longitude).toFixed(4) + ' · candidates are searched around the shared center.</p>';
-  html += '<p class="muted">' + esc(d.objective || "") + "</p>";
+  let html = '<div class="planMeta"><span class="pill">Goal: ' + esc(d.goal) + '</span><span class="pill">Live places</span></div>';
+  if (d.center) html += '<p class="muted planIntro"><b>Shared meeting area:</b> options are selected around the group center and ranked by travel fairness.</p>';
+  html += '<div class="placeResults">';
   (d.candidates || []).forEach((x, i) => {
-    const travel = (x.travelByMember || x.travel || []).map(t => {
-      const name = t.memberName || S.meetup.members.find(v => v.id === t.memberId)?.name || "Member";
-      const distance = Number.isFinite(t.distanceMeters) ? " · " + (t.distanceMeters / 1000).toFixed(1) + " km" : "";
-      return '<span class="pill">' + esc(name) + ": " + (t.durationMinutes ?? "unknown") + " min" + distance + "</span>";
+    const c=x.candidate||{};
+    const travel=(x.travelByMember||x.travel||[]).filter(t=>t.durationMinutes!=null).slice(0,4).map(t=>{
+      const name=t.memberName||S.meetup.members.find(v=>v.id===t.memberId)?.name||"Member";
+      return '<span class="travelChip"><b>'+esc(name)+'</b><span>'+(t.durationMinutes??"—")+' min</span></span>';
     }).join("");
-    const preferenceCoverage = Array.isArray(x.preferenceMatches) ? x.preferenceMatches.map(m => esc(m.memberName) + ": " + ((m.matched || []).join(", ") || "no exact match")).join(" · ") : "";
-    const weather = x.weather?.available ? '<p class="weather"><b>Weather:</b> ' + esc(x.weather.summary || "Forecast available") + "</p>" : "";
-    const fairness = '<p><span class="pill">Fairness: ' + (x.fairnessScore ?? "unavailable") + '%</span><span class="pill">Longest trip: ' + (x.maxTravelMinutes ?? "unknown") + ' min</span><span class="pill">Total travel: ' + (x.totalTravelMinutes ?? "unknown") + ' min</span></p>';
-    const availability = '<p class="muted"><b>Venue verification:</b> ' + esc(x.availabilityStatus || "Opening/availability not verified") + '</p>';
-    const venueInfo = '<p class="muted">' + (x.candidate.openingHours ? 'Opening hours: ' + esc(x.candidate.openingHours) : 'Opening hours: not listed') + (x.candidate.cuisine ? ' · Cuisine: ' + esc(x.candidate.cuisine) : '') + '</p>';
-    const directions = 'https://www.openstreetmap.org/directions?to=' + encodeURIComponent(Number(x.candidate.latitude).toFixed(6) + ',' + Number(x.candidate.longitude).toFixed(6));
-    html += '<div class="candidate"><div class="score">Option ' + (i + 1) + " · " + (x.score === null ? "Verified constraint score unavailable" : x.score + "% verified constraints") + "</div><h3>" + esc(x.candidate.name) + '</h3><p class="muted">' + esc(x.candidate.address || "Address unavailable") + "</p><p>" + travel + "</p>" + fairness + availability + venueInfo + weather + "<p>" + (x.explanation || []).map(esc).join(" · ") + '</p><p class="muted">' + esc(x.budgetStatus || "Budget not verified") + '</p><a href="' + directions + '" target="_blank" rel="noopener" class="mapLink">Open directions</a><button data-vote="' + esc(x.candidate.id) + '">Vote for this option</button></div>';
+    const matches=Array.isArray(x.preferenceMatches)?x.preferenceMatches.flatMap(m=>m.matched||[]).filter(Boolean):[];
+    const matchText=[...new Set(matches)].slice(0,3);
+    const score=x.score==null?"—":x.score+"%";
+    const directions='https://www.openstreetmap.org/directions?to='+encodeURIComponent(Number(c.latitude).toFixed(6)+','+Number(c.longitude).toFixed(6));
+    html+='<article class="placeCard">'+
+      '<div class="placeCardTop"><div class="placeRank">'+String(i+1).padStart(2,"0")+'</div><div class="placeMain"><span class="placeType">'+esc(c.type||"Place")+'</span><h3>'+esc(c.name)+'</h3><p>'+esc(c.address||"Address unavailable")+'</p></div><div class="placeScore"><b>'+esc(score)+'</b><span>match</span></div></div>'+
+      '<div class="placeMetrics"><span>⏱ Longest trip <b>'+(x.maxTravelMinutes??"—")+' min</b></span><span>⚖ Fairness <b>'+(x.fairnessScore??"—")+'%</b></span><span>🚗 Total travel <b>'+(x.totalTravelMinutes??"—")+' min</b></span></div>'+
+      (travel?'<div class="travelChips">'+travel+'</div>':"")+
+      '<div class="placeMetaRow">'+(matchText.length?'<span class="placeTag">✓ '+esc(matchText.join(" · "))+'</span>': '<span class="placeTag mutedTag">Preference match not verified</span>')+
+      (c.cuisine?'<span class="placeTag">'+esc(c.cuisine)+'</span>':"")+
+      (c.openingHours?'<span class="placeTag">🕒 Hours listed</span>':"")+'</div>'+
+      '<div class="placeExplanation">'+esc((x.explanation||[]).slice(-2).join(" · ")||"Selected near the shared meeting area.")+'</div>'+
+      '<div class="placeActions"><a href="'+directions+'" target="_blank" rel="noopener" class="mapLink">Open directions ↗</a><button data-vote="'+esc(c.id)+'">Vote for this place</button></div>'+
+    '</article>';
   });
-  S.candidates = (d.candidates || []).map(x => ({id:x.candidate.id, name:x.candidate.name, address:x.candidate.address || "Address unavailable"}));
-  $("results").innerHTML = html;
-  $("results").querySelectorAll("[data-vote]").forEach(b => b.onclick = () => vote(b.dataset.vote));
+  html += '</div>';
+  $("results").innerHTML=html;
+  S.candidates=(d.candidates||[]).map(x=>({id:x.candidate.id,name:x.candidate.name,address:x.candidate.address||"Address unavailable"}));
+  $("results").querySelectorAll("[data-vote]").forEach(b=>b.onclick=()=>vote(b.dataset.vote));
   renderVotingPanel();
   renderMap();
 }
-
 function renderMap() {
   const el = $("meetupMap");
   if (!el || typeof L === "undefined") return;
