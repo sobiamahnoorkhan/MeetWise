@@ -99,7 +99,7 @@ async function joinMeetup() {
 }
 
 function dashboard() {
-  app.innerHTML = '<main class="shell"><div class="nav"><div><b class="brand">MeetWise</b><div id="meetupTitle" class="muted"></div></div><div id="inviteCard" class="inviteCard"><div class="inviteLabel">INVITE CODE</div><div class="inviteCodeRow"><strong id="inviteCode"></strong><button id="copyInvite" class="iconBtn" title="Copy invite code">⧉</button><button id="shareInvite" class="iconBtn" title="Share invite">↗</button><button id="whatsappInvite" class="whatsappBtn" title="Share invite on WhatsApp" aria-label="Share invite on WhatsApp">WhatsApp</button></div><div id="inviteStatus" class="inviteStatus">Share this code with your group</div></div></div><div id="meetupReminder" class="muted"></div><div class="grid"><section class="card"><h3>Members</h3><div id="members"></div><div class="sectionHeading"><div><span class="cardEyebrow">YOUR INPUT</span><h3>Your preferences</h3></div><span class="prefHint">Used to find a fair group option</span></div><div class="preferenceGrid"><div class="fieldWide locationField"><label class="fieldLabel">📍 Area or neighborhood</label><div class="locationRow"><input id="area" placeholder="e.g. Latifabad, Hyderabad"><button id="useLocation" type="button" class="locationBtn">Use my location</button></div><p id="locationStatus" class="muted"></p></div><div><label class="fieldLabel">🚗 Transport</label><select id="transport"><option value="">Choose transport</option><option value="walking">Walking</option><option value="bike">Bike</option><option value="car">Car</option><option value="public_transport">Public transport</option></select></div><div><label class="fieldLabel">💰 Budget</label><input id="budget" type="number" placeholder="PKR per person"></div><div><label class="fieldLabel">⏱ Max travel</label><input id="maxTravel" type="number" placeholder="Minutes"></div><div><label class="fieldLabel">🍽 Food</label><input id="food" placeholder="e.g. desi, pizza, halal"></div><div><label class="fieldLabel">🎯 Activity</label><input id="activity" placeholder="e.g. dinner, cafe, bowling"></div><div class="fieldWide"><label class="fieldLabel">🗓 Available date & time</label><input id="when" type="datetime-local"></div></div><div class="prefActions"><button id="savePrefs" class="primaryAction">Save preferences <span>✓</span></button><button id="research" class="secondary">Find live options <span>→</span></button><button id="replan" class="secondary">Re-plan</button><p id="status" class="muted"></p></section><section class="card"><h3>Group chat</h3><div id="chat" class="chat"></div><div class="chatComposer"><input id="chatText" placeholder="Type a message or new constraint…"><button id="send" aria-label="Send message">➤</button></div></section></div><section class="card" style="margin-top:18px"><h2>Live Group Preferences</h2><div id="livePrefs" class="livePrefs"></div><p id="syncStatus" class="muted">Live sync enabled</p></section><section class="card" style="margin-top:18px"><h2>AI Meetup Plan</h2><div id="results" class="emptyState">Save preferences and run research.</div></section><section class="card" style="margin-top:18px"><h2>Meetup Map</h2><div id="meetupMap" class="map"></div><p id="mapStatus" class="muted">Save a member location to place it on the map.</p></section><section class="card" style="margin-top:18px"><h2>Group Voting</h2><div id="votingPanel" class="votingPanel"><div class="emptyState">Run live research to create voting options.</div></div></section></main>';
+  app.innerHTML = '<main class="shell"><div class="nav"><div><b class="brand">MeetWise</b><div id="meetupTitle" class="muted"></div></div><div id="inviteCard" class="inviteCard"><div class="inviteLabel">INVITE CODE</div><div class="inviteCodeRow"><strong id="inviteCode"></strong><button id="copyInvite" class="iconBtn" title="Copy invite code">⧉</button><button id="shareInvite" class="iconBtn" title="Share invite">↗</button><button id="whatsappInvite" class="whatsappBtn" title="Share invite on WhatsApp" aria-label="Share invite on WhatsApp">WhatsApp</button></div><div id="inviteStatus" class="inviteStatus">Share this code with your group</div></div></div><div id="meetupReminder" class="muted"></div><div class="grid"><section class="card"><h3>Members</h3><div id="members"></div><div class="sectionHeading"><div><span class="cardEyebrow">YOUR INPUT</span><h3>Your preferences</h3></div><span class="prefHint">Used to find a fair group option</span></div><div class="preferenceGrid"><div class="fieldWide locationField"><label class="fieldLabel">📍 Meetup area</label><div class="locationRow"><input id="area" placeholder="Search a city, area or neighborhood..."><button id="useLocation" type="button" class="locationBtn">Use my location</button></div><div class="manualLocationRow"><input id="locationSearch" placeholder="🔎 Search for a place or area..." autocomplete="off"><button id="searchLocation" type="button" class="locationSearchBtn">Search</button></div><div id="locationSuggestions" class="locationSuggestions"></div><p id="locationStatus" class="muted"></p></div><div><label class="fieldLabel">🚗 Transport</label><select id="transport"><option value="">Choose transport</option><option value="walking">Walking</option><option value="bike">Bike</option><option value="car">Car</option><option value="public_transport">Public transport</option></select></div><div><label class="fieldLabel">💰 Budget</label><input id="budget" type="number" placeholder="PKR per person"></div><div><label class="fieldLabel">⏱ Max travel</label><input id="maxTravel" type="number" placeholder="Minutes"></div><div><label class="fieldLabel">🍽 Food</label><input id="food" placeholder="e.g. desi, pizza, halal"></div><div><label class="fieldLabel">🎯 Activity</label><input id="activity" placeholder="e.g. dinner, cafe, bowling"></div><div class="fieldWide"><label class="fieldLabel">🗓 Available date & time</label><input id="when" type="datetime-local"></div></div><div class="prefActions"><button id="savePrefs" class="primaryAction">Save preferences <span>✓</span></button><button id="research" class="secondary">Find live options <span>→</span></button><button id="replan" class="secondary">Re-plan</button><p id="status" class="muted"></p></section><section class="card"><h3>Group chat</h3><div id="chat" class="chat"></div><div class="chatComposer"><input id="chatText" placeholder="Type a message or new constraint…"><button id="send" aria-label="Send message">➤</button></div></section></div><section class="card" style="margin-top:18px"><h2>Live Group Preferences</h2><div id="livePrefs" class="livePrefs"></div><p id="syncStatus" class="muted">Live sync enabled</p></section><section class="card" style="margin-top:18px"><h2>AI Meetup Plan</h2><div id="results" class="emptyState">Save preferences and run research.</div></section><section class="card" style="margin-top:18px"><h2>Meetup Map</h2><div id="meetupMap" class="map"></div><p id="mapStatus" class="muted">Save a member location to place it on the map.</p></section><section class="card" style="margin-top:18px"><h2>Group Voting</h2><div id="votingPanel" class="votingPanel"><div class="emptyState">Run live research to create voting options.</div></div></section></main>';
   $("meetupTitle").textContent = S.meetup.title;
 
   $("inviteCode").textContent = S.meetup.inviteCode || "------";
@@ -108,7 +108,7 @@ function dashboard() {
   $("whatsappInvite").onclick = shareInviteWhatsApp;
   setupMeetupReminder();
   $("savePrefs").onclick = savePrefs;
-  $("useLocation").onclick = useCurrentLocation;
+  $("useLocation").onclick = useCurrentLocation;\n  $("searchLocation").onclick = searchManualLocation;\n  $("locationSearch").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); searchManualLocation(); } });
   $("research").onclick = research;
   $("replan").onclick = replan;
   $("send").onclick = sendChat;
@@ -411,6 +411,56 @@ function renderMap() {
   if (points.length) S.map.fitBounds(points,{padding:[25,25]});
   const status=$("mapStatus");
   if(status) status.textContent=points.length ? "Member locations and researched meetup places are shown on the map." : "Save an area first, then research live options.";
+}
+
+async function searchManualLocation() {
+  const query = $("locationSearch")?.value.trim();
+  const status = $("locationStatus");
+  const suggestions = $("locationSuggestions");
+  if (!query) {
+    if (status) status.textContent = "Enter a city, area, neighborhood or place to search.";
+    return;
+  }
+  if (suggestions) suggestions.innerHTML = "";
+  if (status) status.textContent = "Searching location...";
+  try {
+    const r = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5&q=" + encodeURIComponent(query), {
+      headers: {"Accept":"application/json"}
+    });
+    if (!r.ok) throw new Error("Location search failed");
+    const results = await r.json();
+    if (!results.length) {
+      if (status) status.textContent = "No matching location found. Try a nearby city, area or landmark.";
+      return;
+    }
+    if (suggestions) {
+      suggestions.innerHTML = results.map((item, i) =>
+        '<button type="button" class="locationSuggestion" data-location-index="' + i + '"><span>📍</span><span><b>' + esc(item.name || query) + '</b><small>' + esc(item.display_name || "") + '</small></span></button>'
+      ).join("");
+      suggestions.querySelectorAll("[data-location-index]").forEach(btn => {
+        btn.onclick = () => selectManualLocation(results[Number(btn.dataset.locationIndex)]);
+      });
+    }
+    if (results.length === 1) selectManualLocation(results[0]);
+    else if (status) status.textContent = "Select the correct location from the results.";
+  } catch (e) {
+    if (status) status.textContent = "Could not search this location. Please try again.";
+  }
+}
+
+function selectManualLocation(item) {
+  const lat = Number(item.lat);
+  const lon = Number(item.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+  S.selectedLocation = { latitude: lat, longitude: lon };
+  const address = item.address || {};
+  const readable = [address.neighbourhood || address.suburb || address.quarter, address.city || address.town || address.village, address.state].filter(Boolean).join(", ");
+  $("area").value = readable || item.display_name || $("locationSearch").value.trim();
+  $("locationSearch").value = "";
+  if ($("locationSuggestions")) $("locationSuggestions").innerHTML = "";
+  $("locationStatus").innerHTML = "✓ Location selected · <button type="button" id="openMyLocation" class="inlineLink">Open location</button>";
+  $("openMyLocation").onclick = () => openMapLocation(lat, lon);
+  S.prefsDirty = true;
 }
 
 async function useCurrentLocation() {
