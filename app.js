@@ -108,7 +108,9 @@ function dashboard() {
   $("whatsappInvite").onclick = shareInviteWhatsApp;
   setupMeetupReminder();
   $("savePrefs").onclick = savePrefs;
-  $("useLocation").onclick = useCurrentLocation;\n  $("searchLocation").onclick = searchManualLocation;\n  $("locationSearch").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); searchManualLocation(); } });
+  $("useLocation").onclick = useCurrentLocation;
+  $("searchLocation").onclick = searchManualLocation;
+  $("locationSearch").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); searchManualLocation(); } });
   $("research").onclick = research;
   $("replan").onclick = replan;
   $("send").onclick = sendChat;
