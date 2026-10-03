@@ -21,7 +21,18 @@ function bbox(center:Center,radiusKm:number){
  return {west:center.longitude-lonDelta,north:center.latitude+latDelta,east:center.longitude+lonDelta,south:center.latitude-latDelta};
 }
 
-function normalizePlaceName(name:string){ return name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g," ").trim().replace(/\b(restaurant|cafe|coffee|shop|mall|the|restaurant)\b/g,"").replace(/\s+/g," ").trim(); }\n\nfunction isDuplicatePlace(results:PlaceCandidate[],candidate:PlaceCandidate){\n const key=normalizePlaceName(candidate.name);\n return results.some(existing=>{\n  const sameName=key && normalizePlaceName(existing.name)===key;\n  const near=distanceKm(existing,candidate)<=0.08;\n  return sameName || near;\n });\n}\n\nfunction distanceKm(a:Center,b:Center){
+function normalizePlaceName(name:string){ return name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g," ").trim().replace(/\b(restaurant|cafe|coffee|shop|mall|the|restaurant)\b/g,"").replace(/\s+/g," ").trim(); }
+
+function isDuplicatePlace(results:PlaceCandidate[],candidate:PlaceCandidate){
+ const key=normalizePlaceName(candidate.name);
+ return results.some(existing=>{
+  const sameName=key && normalizePlaceName(existing.name)===key;
+  const near=distanceKm(existing,candidate)<=0.08;
+  return sameName || near;
+ });
+}
+
+function distanceKm(a:Center,b:Center){
  const dy=(a.latitude-b.latitude)*111;
  const dx=(a.longitude-b.longitude)*111*Math.cos(a.latitude*Math.PI/180);
  return Math.sqrt(dx*dx+dy*dy);
