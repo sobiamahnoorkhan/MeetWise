@@ -14,7 +14,9 @@ const S = {
   map: null,
   selectedLocation: null,
   reminderTimer: null,
-  autoPlanRunning: false
+  autoPlanRunning: false,
+  lastChatCount: null,
+  chatPopupTimer: null
 };
 const $ = id => document.getElementById(id);
 const pendingInviteCode = (() => { const code = new URLSearchParams(window.location.search).get("invite"); return code ? code.trim().toUpperCase() : ""; })();
@@ -227,12 +229,59 @@ function renderLivePreferences() {
 }
 
 function renderChat() {
-  $("chat").innerHTML = S.meetup.chat.map(x => {
+  const el = $("chat");
+  if (!el) return;
+  const messages = Array.isArray(S.meetup?.chat) ? S.meetup.chat : [];
+  const previousCount = S.lastChatCount;
+  S.lastChatCount = messages.length;
+  el.innerHTML = messages.length ? messages.map(x => {
     const m = S.meetup.members.find(v => v.id === x.memberId);
-    return '<div class="msg"><b>' + esc(m?.name || "Member") + ":</b> " + esc(x.text) + "</div>";
-  }).join("");
+    const mine = x.memberId === S.memberId;
+    const name = m?.name || "Member";
+    const initials = name.split(/\s+/).map(v => v[0]).join("").slice(0,2).toUpperCase();
+    const rawTime = x.createdAt || x.created_at;
+    const time = rawTime ? new Date(rawTime).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}) : "";
+    return '<div class="chatMessage ' + (mine ? "mine" : "theirs") + '">' +
+      '<div class="chatAvatar">' + esc(initials) + '</div>' +
+      '<div class="chatMessageBody"><div class="msgBubble"><span class="msgName">' + (mine ? "You" : esc(name)) + '</span><div class="msgText">' + esc(x.text) + '</div><span class="msgTime">' + esc(time) + '</span></div></div>' +
+      '</div>';
+  }).join("") : '<div class="chatEmpty"><div class="chatEmptyIcon">💬</div><b>Your group chat is ready</b><span>Share ideas, preferences and meetup decisions here.</span></div>';
+  el.scrollTop = el.scrollHeight;
+  if (previousCount !== null && messages.length > previousCount) {
+    const latest = messages[messages.length - 1];
+    if (latest?.memberId !== S.memberId) {
+      const member = S.meetup.members.find(v => v.id === latest.memberId);
+      showChatPopup(member?.name || "New message", latest.text);
+    }
+  }
 }
-
+function showChatPopup(name, message) {
+  let popup = $("chatPopup");
+  if (!popup) {
+    popup = document.createElement("div");
+    popup.id = "chatPopup";
+    popup.className = "chatPopup";
+    document.body.appendChild(popup);
+  }
+  popup.innerHTML = '<div class="chatPopupIcon">💬</div><div class="chatPopupCopy"><b>' + esc(name) + '</b><span>' + esc(message) + '</span></div><button type="button" class="chatPopupClose" aria-label="Dismiss">×</button>';
+  popup.classList.add("show");
+  popup.querySelector(".chatPopupClose").onclick = () => popup.classList.remove("show");
+  clearTimeout(S.chatPopupTimer);
+  S.chatPopupTimer = setTimeout(() => popup.classList.remove("show"), 4200);
+}
+function setChatTyping(show, label = "Writing…") {
+  let el = $("chatTyping");
+  if (!el) {
+    const chat = $("chat");
+    if (!chat) return;
+    el = document.createElement("div");
+    el.id = "chatTyping";
+    el.className = "chatTyping";
+    chat.parentElement.insertBefore(el, chat.nextSibling);
+  }
+  el.innerHTML = show ? '<span>' + esc(label) + '</span><i></i><i></i><i></i>' : "";
+  el.classList.toggle("visible", show);
+}
 function fillPrefs() {
   if (S.prefsDirty) return;
   if (!$("area") || !$("transport") || !$("budget") || !$("maxTravel") || !$("food") || !$("activity") || !$("when")) return;
@@ -390,42 +439,36 @@ function openMapLocation(lat, lon) {
 function renderVotingPanel() {
   const el = $("votingPanel");
   if (!el) return;
-  // Always rebuild from the server-persisted plan. Do not depend on the
-  // browser that originally performed the research.
   if (S.meetup?.finalPlan?.status === "ready") {
     S.candidates = (S.meetup.finalPlan.candidates || []).map(x => ({id:x.candidate.id,name:x.candidate.name,address:x.candidate.address||"Address unavailable"}));
   }
   if (!S.candidates.length) {
-    el.innerHTML = "<div class=\"emptyState\">Save member locations and run live research to create voting options.</div>";
+    el.innerHTML = '<div class="voteEmpty"><div class="voteEmptyIcon">🗳️</div><b>Voting will appear here</b><span>Run live research to create places your group can vote on.</span></div>';
     return;
   }
   const votes = S.meetup?.votes || [];
   const totalMembers = S.meetup?.members?.length || 0;
-  const counts = S.candidates.map(c => ({
-    candidate:c,
-    count:votes.filter(v => v.optionId === c.id).length
-  })).sort((a,b) => b.count - a.count);
+  const counts = S.candidates.map(c => ({candidate:c,count:votes.filter(v => v.optionId === c.id).length})).sort((a,b) => b.count-a.count);
   const maxVotes = counts[0]?.count || 0;
   const voters = new Set(votes.map(v => v.memberId));
+  const remaining = Math.max(0,totalMembers-voters.size);
   const allMembersVoted = totalMembers > 0 && voters.size >= totalMembers;
   const leaders = counts.filter(x => x.count === maxVotes && maxVotes > 0);
-  let finalHtml = "";
+  const myVote = votes.find(v => v.memberId === S.memberId)?.optionId;
+  let result = '<div class="voteStatus progress"><b>Voting is open</b><span>' + remaining + ' member' + (remaining===1?"":"s") + ' still to vote</span></div>';
   if (allMembersVoted && leaders.length === 1) {
-    const winner = leaders[0].candidate;
-    finalHtml = `<div class="candidate" style="margin-bottom:16px"><div class="score">Final Group Choice</div><h2>🏆 ${esc(winner.name)}</h2><p class="muted">${esc(winner.address)}</p><p><b>${maxVotes} vote${maxVotes === 1 ? "" : "s"} · 100% of members</b></p><p class="muted">Everyone has voted and this place has the highest vote count.</p></div>`;
+    const w=leaders[0].candidate;
+    result='<div class="voteResult winner"><div class="resultIcon">🏆</div><div><span class="resultEyebrow">FINAL GROUP CHOICE</span><h3>'+esc(w.name)+'</h3><p>'+esc(w.address)+'</p></div><strong>'+maxVotes+'/'+totalMembers+'</strong></div>';
   } else if (allMembersVoted && leaders.length > 1) {
-    finalHtml = `<div class="candidate" style="margin-bottom:16px"><div class="score">Voting Tie</div><h3>Two or more places have the same highest votes.</h3><p class="muted">No place is marked as the final choice until the group breaks the tie.</p></div>`;
-  } else {
-    const remaining = Math.max(0, totalMembers - voters.size);
-    finalHtml = `<div class="candidate" style="margin-bottom:16px"><div class="score">Voting in progress</div><p>${remaining ? remaining + " member" + (remaining === 1 ? "" : "s") + " still need to vote." : "Waiting for votes."}</p></div>`;
+    result='<div class="voteResult tie"><div class="resultIcon">⚖️</div><div><span class="resultEyebrow">VOTING TIE</span><h3>More than one place is leading</h3><p>Choose again to break the tie.</p></div></div>';
   }
-  el.innerHTML = finalHtml + counts.map(({candidate:c,count}) => {
-    const mine = votes.some(v => v.memberId === S.memberId && v.optionId === c.id);
-    return `<div class="candidate"><div class="score">${count} vote${count === 1 ? "" : "s"} · ${totalMembers ? Math.round(count / totalMembers * 100) : 0}% of members</div><h3>${esc(c.name)}</h3><p class="muted">${esc(c.address)}</p><button data-panel-vote="${esc(c.id)}">${mine ? "✓ Your vote" : "Vote for this option"}</button></div>`;
-  }).join("");
-  el.querySelectorAll("[data-panel-vote]").forEach(b => b.onclick = () => vote(b.dataset.panelVote));
+  el.innerHTML='<div class="voteHeader"><div><span class="cardEyebrow">GROUP DECISION</span><h3>Where should we meet?</h3><p>Vote for the place that works best for everyone.</p></div>'+result+'</div><div class="voteOptions">'+counts.map(({candidate:c,count})=>{
+    const pct=totalMembers?Math.round(count/totalMembers*100):0;
+    const mine=myVote===c.id;
+    return '<article class="voteOption '+(mine?"selected":"")+'"><div class="voteOptionTop"><div class="placeIcon">📍</div><div class="placeInfo"><h4>'+esc(c.name)+'</h4><p>'+esc(c.address)+'</p></div><div class="voteCount"><b>'+count+'</b><span>'+ (count===1?"vote":"votes")+'</span></div></div><div class="voteBar"><span style="width:'+pct+'%"></span></div><div class="voteOptionBottom"><span>'+pct+'% of members</span><button class="'+(mine?"voted":"")+'" data-panel-vote="'+esc(c.id)+'">'+(mine?"✓ Voted":"Vote")+'</button></div></article>';
+  }).join("")+'</div>';
+  el.querySelectorAll("[data-panel-vote]").forEach(b => b.onclick=()=>vote(b.dataset.panelVote));
 }
-
 async function vote(id) {
   try {
     if (!S.meetup?.members?.some(m => m.id === S.memberId)) {
@@ -451,13 +494,13 @@ async function sendChat() {
   const text = $("chatText").value.trim();
   if (!text) return;
   try {
+    setChatTyping(true, "Sending");
     await api("/meetups/" + S.meetup.id + "/chat", {method:"POST", body:JSON.stringify({memberId:S.memberId,text})});
     $("chatText").value = "";
+    setChatTyping(false);
     await refresh();
-
-  } catch (e) { alert(e.message); }
+  } catch (e) { setChatTyping(false); alert(e.message); }
 }
-
 async function logout() {
   if (S.liveTimer) clearInterval(S.liveTimer);
   try { await api("/auth/logout", {method:"POST"}); } catch {}
